@@ -1,6 +1,6 @@
 # ai-vehicles
 
-Owned vehicles: storage, ownership (characters, jobs, gangs), spawning on the server and the look (props) applied by the entity's owner client. The API garages, shops, keys and fuel build on; stands in for `qbx_vehicles`. Depends on ai-core and its table through `@aicore-fivem/mysql`. Research and decisions: `docs/research/vehicles.md`.
+Owned vehicles: storage, ownership (characters, jobs, gangs), spawning on the server and the look (props) applied by the entity's owner client. The API garages, shops, keys and fuel build on; stands in for `qbx_vehicles`. Depends on ai-core and its table through `@aicore-fivem/mysql`.
 
 ## Decisions
 
