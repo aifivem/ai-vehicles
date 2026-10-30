@@ -26,10 +26,18 @@ const CORE = {
 	activeGangChangedEvent: "ai-core:activeGangChanged",
 	/** (src, charIds: number[]) each time a player's character screen loads; an appearance resource answers with portraits. */
 	characterScreenEvent: "ai-core:characterScreen",
+	/** (resource: string | null) the inventory behind ai-core's inventory layer changed (the bridge drops its item cache). */
+	inventoryChangedEvent: "ai-core:inventoryChanged",
+	/** (src, name: string, status: Record<string, number> | null) a player used an item; status = the needs it gives, from inventories that define them. */
+	itemUsedEvent: "ai-core:itemUsed",
+	/** (src, killer: number | null, weaponHash: number) a player with a loaded character died; fired from FXServer's `onPedDeath` (needs `PED_DEATH_STATE_KEY`). */
+	playerDiedEvent: "ai-core:playerDied",
 	clientPlayerLoadedEvent: "ai-core:client:playerLoaded",
 	clientPlayerUnloadedEvent: "ai-core:client:playerUnloaded",
 	/** (charId: number, url: string) a portrait image of a character on the character screen (e.g. `https://nui-img/<txd>/<txd>`). */
 	clientCharacterPortraitEvent: "ai-core:client:characterPortrait",
+	/** (charId: number) ai-appearance holds this character's look: ai-core dresses its scene ped with `ApplyCharacterAppearance`. */
+	clientCharacterLookEvent: "ai-core:client:characterLook",
 	/** (resource: string, id: string) the interaction key was pressed while that resource's prompt was on top. */
 	clientPromptPressedEvent: "ai-core:client:promptPressed",
 	/** (key: keyof PlayerCache, value) a cached value of the local player changed (one watcher in ai-core for every resource). */
@@ -161,6 +169,14 @@ function registerExport(name, handler) {
 function resourceExport(resource) {
 	return globalThis.exports[resource];
 }
+/** Whether a resource is running now. */
+function isResourceStarted(resource) {
+	return GetResourceState(resource) === "started";
+}
+/** Another resource's exports while it runs, null when it does not (an optional dependency). */
+function optionalExport(resource) {
+	return isResourceStarted(resource) ? globalThis.exports[resource] : null;
+}
 /** Answers `exports["<resource>"].<name>` for a resource name this one `provide`s: provide makes the name exist but does not alias its exports, so each export of the stood-in resource is answered through FiveM's export event. */
 function provideExport(resource, name, fn) {
 	on(`__cfx_export_${resource}_${name}`, (setCallback) => setCallback(fn));
@@ -217,7 +233,7 @@ const responseEvent = (resource) => `aicore:cbr:${resource}`;
 const DEFAULT_CALLBACK_TIMEOUT = 3e4;
 
 // ../../../packages/lib/src/server/gate.ts
-const log$4 = createLogger(GetCurrentResourceName());
+const log$5 = createLogger(GetCurrentResourceName());
 /** Every gate of this resource; one playerDropped listener frees them all (one listener per gate trips Node's limit). */
 const gates = /* @__PURE__ */ new Set();
 on("playerDropped", () => {
@@ -226,11 +242,11 @@ on("playerDropped", () => {
 });
 
 // ../../../packages/lib/src/server/callback.ts
-const log$3 = createLogger(GetCurrentResourceName());
-const resource$3 = GetCurrentResourceName();
+const log$4 = createLogger(GetCurrentResourceName());
+const resource$4 = GetCurrentResourceName();
 const pending$1 = /* @__PURE__ */ new Map();
 let nextId = 0;
-onNet(responseEvent(resource$3), (id, ok, result) => {
+onNet(responseEvent(resource$4), (id, ok, result) => {
 	const entry = typeof id === "number" ? pending$1.get(id) : void 0;
 	if (!entry || entry.source !== Number(globalThis.source)) return;
 	pending$1.delete(id);
@@ -252,9 +268,67 @@ function triggerClientCallback(name, source, args = [], timeoutMs = DEFAULT_CALL
 			reject,
 			timer
 		});
-		emitNet(requestEvent(name), source, resource$3, id, ...args);
+		emitNet(requestEvent(name), source, resource$4, id, ...args);
 	});
 }
+
+// ../../../packages/lib/src/server/command.ts
+const resource$3 = GetCurrentResourceName();
+const log$3 = createLogger(resource$3);
+/**
+* This resource's commands: announces them to ai-core (one call per tick of additions) and keeps each player's chat
+* suggestions as a delta of the commands they may use (sent when a character loads, after job or gang changes, and
+* to everyone online when commands are added; removed for everyone when the resource stops).
+*/
+var CommandSet = class {
+	list = [];
+	sent = /* @__PURE__ */ new Map();
+	announced = 0;
+	queued = false;
+	listening = false;
+	add(command) {
+		if (!this.listening) this.listen();
+		this.list.push(command);
+		if (this.queued) return;
+		this.queued = true;
+		setImmediate(() => this.flush());
+	}
+	/** Sends `source` the suggestions they gained and removes the ones they lost. */
+	refresh(source) {
+		const before = this.sent.get(source);
+		const now = /* @__PURE__ */ new Set();
+		const add = [];
+		for (const command of this.list) for (const name of command.info.names) {
+			if (!command.allowed(source, name)) continue;
+			now.add(name);
+			if (!before?.has(name)) add.push(command.suggestion(name));
+		}
+		this.sent.set(source, now);
+		if (add.length) emitNet("chat:addSuggestions", source, add);
+		if (before) {
+			for (const name of before) if (!now.has(name)) emitNet("chat:removeSuggestion", source, `/${name}`);
+		}
+	}
+	flush() {
+		this.queued = false;
+		optionalExport(CORE.resource)?.RegisterCommands(resource$3, this.list.slice(this.announced).map((c) => c.info));
+		this.announced = this.list.length;
+		for (const player of getPlayers()) this.refresh(Number(player));
+	}
+	listen() {
+		this.listening = true;
+		const refresh = (source) => this.refresh(Number(source));
+		on(CORE.playerLoadedEvent, refresh);
+		on(CORE.jobsChangedEvent, refresh);
+		on(CORE.gangsChangedEvent, refresh);
+		on("playerDropped", () => this.sent.delete(Number(globalThis.source)));
+		on("onResourceStop", (name) => {
+			if (name !== resource$3) return;
+			for (const command of this.list) for (const n of command.info.names) emitNet("chat:removeSuggestion", -1, `/${n}`);
+		});
+	}
+};
+const commands = new CommandSet();
 
 // ../../../packages/lib/src/server/netEvent.ts
 const log$2 = createLogger(GetCurrentResourceName());
