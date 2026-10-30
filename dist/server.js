@@ -18,6 +18,13 @@ function waitFor(check, timeoutMs = 1e4, intervalMs = 0) {
 function readFinite(value) {
 	return typeof value == "number" && Number.isFinite(value) ? value : null;
 }
+// ../../../packages/lib/src/shared/lang.ts
+function formatText(template, args) {
+	return template.replace(/\{(\d+)\}/g, (match, index) => {
+		let value = args[Number(index)];
+		return value === void 0 ? match : String(value);
+	});
+}
 // ../../../packages/lib/src/shared/vehicleProps.ts
 const isObj = (v) => typeof v == "object" && !!v && !Array.isArray(v), nums = (v, n) => Array.isArray(v) && v.length === n && v.every((x) => typeof x == "number") ? v : null;
 function toVehicleProps(v) {
@@ -65,15 +72,30 @@ function toVehicleProps(v) {
 		bodyHealth: n(v.bodyHealth, 1e3)
 	};
 }
+const rgbOf = (v) => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x == "number" && x >= 0 && x <= 255) ? [
+	v[0],
+	v[1],
+	v[2]
+] : void 0, intOf = (v, min, max) => typeof v == "number" && Number.isInteger(v) && v >= min && v <= max ? v : void 0, colorsOf = (v) => {
+	if (!Array.isArray(v) || v.length !== 2) return;
+	let [a, b] = [intOf(v[0], 0, 255), intOf(v[1], 0, 255)];
+	return a === void 0 || b === void 0 ? void 0 : [a, b];
+};
+function toVehicleSetup(v) {
+	return isObj(v) ? {
+		maxed: v.maxed === !0 || void 0,
+		colors: colorsOf(v.colors),
+		primary: rgbOf(v.primary),
+		secondary: rgbOf(v.secondary),
+		livery: intOf(v.livery, 0, 100),
+		windowTint: intOf(v.windowTint, 0, 6),
+		dirt: intOf(v.dirt, 0, 15),
+		engineOn: v.engineOn === !0 || void 0
+	} : null;
+}
 // ../../../packages/lib/src/shared/index.ts
 function isRecord(value) {
 	return typeof value == "object" && !!value && !Array.isArray(value);
-}
-function formatText(template, args) {
-	return template.replace(/\{(\d+)\}/g, (match, index) => {
-		let value = args[Number(index)];
-		return value === void 0 ? match : String(value);
-	});
 }
 function createLogger(resource) {
 	let prefix = `[${resource}]`;
@@ -218,42 +240,65 @@ new class {
 }(), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/online.ts
 const core$12 = resourceExport(CORE.resource);
+function reindex(index, source, before, after) {
+	for (let name of before) {
+		let set = index.get(name);
+		set && (set.delete(source), set.size === 0 && index.delete(name));
+	}
+	for (let name of after) {
+		let set = index.get(name);
+		set || index.set(name, set = new Set()), set.add(source);
+	}
+}
 var OnlinePlayers = class {
 	players = new Map();
 	onDuty = new Map();
+	jobIndex = new Map();
+	gangIndex = new Map();
 	started = !1;
 	start() {
 		if (this.started) return;
 		this.started = !0;
 		let load = (source, character) => {
-			this.put(source, character, (core$12.GetJobs(source) ?? []).map((m) => m.job), (core$12.GetGangs(source) ?? []).map((m) => m.gang)), this.setDuty(source, core$12.GetDutyJob(source));
+			this.drop(source), this.players.set(source, {
+				character,
+				jobs: [],
+				jobNames: [],
+				gangs: [],
+				gangNames: [],
+				duty: null
+			}), this.setJobs(source, core$12.GetJobs(source) ?? []), this.setGangs(source, core$12.GetGangs(source) ?? []), this.setDuty(source, core$12.GetDutyJob(source));
 		};
-		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => {
-			let player = this.players.get(source);
-			player && (player.jobs = jobs.map((m) => m.job));
-		}), on(CORE.gangsChangedEvent, (source, gangs) => {
-			let player = this.players.get(source);
-			player && (player.gangs = gangs.map((m) => m.gang));
-		}), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
+		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
 		for (let source of core$12.GetLoadedSources()) {
 			let character = core$12.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
-	put(source, character, jobs, gangs) {
-		this.drop(source), this.players.set(source, {
-			character,
-			jobs,
-			gangs,
-			duty: null
-		});
-	}
 	drop(source) {
-		this.setDuty(source, null), this.players.delete(source);
+		let player = this.players.get(source);
+		player && (this.setDuty(source, null), reindex(this.jobIndex, source, player.jobNames, []), reindex(this.gangIndex, source, player.gangNames, []), this.players.delete(source));
+	}
+	setJobs(source, jobs) {
+		let player = this.players.get(source);
+		if (!player) return;
+		let names = jobs.map((m) => m.job);
+		reindex(this.jobIndex, source, player.jobNames, names), player.jobs = jobs, player.jobNames = names;
+	}
+	setGangs(source, gangs) {
+		let player = this.players.get(source);
+		if (!player) return;
+		let names = gangs.map((m) => m.gang);
+		reindex(this.gangIndex, source, player.gangNames, names), player.gangs = gangs, player.gangNames = names;
 	}
 	setDuty(source, job) {
 		let player = this.players.get(source);
-		if (!player || (player.duty && this.onDuty.get(player.duty)?.delete(source), player.duty = job, !job)) return;
+		if (!player) return;
+		if (player.duty) {
+			let set = this.onDuty.get(player.duty);
+			set?.delete(source), set?.size === 0 && this.onDuty.delete(player.duty);
+		}
+		if (player.duty = job, !job) return;
 		let set = this.onDuty.get(job);
 		set || this.onDuty.set(job, set = new Set()), set.add(source);
 	}
@@ -267,13 +312,35 @@ var OnlinePlayers = class {
 		return this.start(), this.players.get(source)?.character ?? null;
 	}
 	jobs(source) {
-		return this.start(), this.players.get(source)?.jobs ?? [];
+		return this.start(), this.players.get(source)?.jobNames ?? [];
 	}
 	gangs(source) {
-		return this.start(), this.players.get(source)?.gangs ?? [];
+		return this.start(), this.players.get(source)?.gangNames ?? [];
+	}
+	jobGrade(source, job) {
+		return this.start(), this.players.get(source)?.jobs.find((m) => m.job === job)?.grade ?? null;
+	}
+	gangGrade(source, gang) {
+		return this.start(), this.players.get(source)?.gangs.find((m) => m.gang === gang)?.grade ?? null;
+	}
+	jobMembers(job) {
+		return this.start(), this.jobIndex.get(job) ?? EMPTY;
+	}
+	gangMembers(gang) {
+		return this.start(), this.gangIndex.get(gang) ?? EMPTY;
 	}
 	dutyJob(source) {
 		return this.start(), this.players.get(source)?.duty ?? null;
+	}
+	onDutyIn(source, jobs) {
+		let duty = this.dutyJob(source);
+		return duty !== null && jobs.includes(duty);
+	}
+	countOnDuty(jobs) {
+		this.start();
+		let count = 0;
+		for (let job of jobs) count += this.onDuty.get(job)?.size ?? 0;
+		return count;
 	}
 	onDutyFor(job) {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
@@ -604,9 +671,10 @@ function readDebug() {
 		debugList = [];
 	}
 }
-readDebug(), setInterval(readDebug, 1e4);
+let debugReadAt = 0;
 function debugEnabled() {
-	return debugAll || debugList.includes(resource$2);
+	let now = Date.now();
+	return now - debugReadAt >= 1e4 && (debugReadAt = now, readDebug()), debugAll || debugList.includes(resource$2);
 }
 function push(list, record, max) {
 	list.push(record), list.length > max && list.splice(0, list.length - max);
@@ -14701,7 +14769,81 @@ async function createDatabaseTables(resource, file) {
 		else for (let [name, definition] of statement.columns) columns.has(name) || (await mysql.query(`ALTER TABLE \`${statement.table}\` ADD COLUMN ${definition}`), log$1.info(`^2added column ${statement.table}.${name}^7 (${resource})`));
 	}
 }
-IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
+// ../../../packages/lib/src/fivem/scheduler.ts
+var Group = class {
+	interval;
+	jobs = Array(8);
+	gens = Array(8).fill(0);
+	dues = Array(8).fill(0);
+	head = 0;
+	mask = 7;
+	count = 0;
+	constructor(interval) {
+		this.interval = interval;
+	}
+	get front() {
+		return this.dues[this.head] ?? 0;
+	}
+	push(job, due) {
+		this.count > this.mask && this.grow();
+		let i = this.head + this.count & this.mask;
+		this.jobs[i] = job, this.gens[i] = job.gen, this.dues[i] = due, this.count++;
+	}
+	run(now) {
+		for (let left = this.count; left > 0 && this.count > 0; left--) {
+			let i = this.head, due = this.dues[i] ?? 0;
+			if (due > now) return;
+			let job = this.jobs[i], gen = this.gens[i];
+			if (this.jobs[i] = void 0, this.head = i + 1 & this.mask, this.count--, !job || job.gen !== gen) continue;
+			let next = due + this.interval;
+			next <= now && (next = now + this.interval), this.push(job, next), job.call();
+		}
+	}
+	grow() {
+		let size = (this.mask + 1) * 2, jobs = Array(size), gens = Array(size).fill(0), dues = Array(size).fill(0);
+		for (let n = 0; n < this.count; n++) {
+			let i = this.head + n & this.mask;
+			jobs[n] = this.jobs[i], gens[n] = this.gens[i] ?? 0, dues[n] = this.dues[i] ?? 0;
+		}
+		this.jobs = jobs, this.gens = gens, this.dues = dues, this.head = 0, this.mask = size - 1;
+	}
+};
+new class {
+	groups = [];
+	byInterval = new Map();
+	tick = null;
+	active = 0;
+	nextDue = Infinity;
+	running = !1;
+	activate(job) {
+		job.gen++, this.active++;
+		let due = GetGameTimer() + job.interval, group = this.byInterval.get(job.interval);
+		group || (group = new Group(job.interval), this.byInterval.set(job.interval, group), this.groups.push(group)), group.push(job, due), due < this.nextDue && (this.nextDue = due), this.tick ??= setTick(this.onTick);
+	}
+	deactivate(job) {
+		job.gen++, this.active--, this.active === 0 && !this.running && this.halt();
+	}
+	halt() {
+		this.tick !== null && clearTick(this.tick), this.tick = null, this.groups.length = 0, this.byInterval.clear(), this.nextDue = Infinity;
+	}
+	onTick = () => {
+		let now = GetGameTimer();
+		if (now < this.nextDue) return;
+		let groups = this.groups;
+		this.running = !0;
+		for (let i = 0; i < groups.length; i++) {
+			let group = groups[i];
+			group && group.count > 0 && group.front <= now && group.run(now);
+		}
+		if (this.running = !1, this.active === 0) return this.halt();
+		let soonest = Infinity, kept = 0;
+		for (let i = 0; i < groups.length; i++) {
+			let group = groups[i];
+			group && (group.count === 0 ? this.byInterval.delete(group.interval) : (groups[kept++] = group, group.front < soonest && (soonest = group.front)));
+		}
+		groups.length = kept, this.nextDue = soonest;
+	};
+}(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/index.ts
 var WriteQueue = class {
 	onError;
@@ -14724,9 +14866,9 @@ IsDuplicityVersion();
 const log = createLogger(ResourceName), plateOf = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8), ownerKey = (owner) => `${owner.type}:${owner.id}`, isOwnerType = (v) => v === "character" || v === "job" || v === "gang", isState$1 = (v) => v === "garage" || v === "out" || v === "impound";
 function fromRow(row) {
 	if (!isOwnerType(row.owner_type)) return null;
-	let props = null;
+	let props = null, setup = null;
 	try {
-		props = row.props ? toVehicleProps(JSON.parse(row.props)) : null;
+		props = row.props ? toVehicleProps(JSON.parse(row.props)) : null, setup = row.setup ? toVehicleSetup(JSON.parse(row.setup)) : null;
 	} catch (error) {
 		log.error(`vehicle ${row.id} has broken props`, error);
 	}
@@ -14739,6 +14881,7 @@ function fromRow(row) {
 		},
 		model: row.model,
 		props,
+		setup,
 		state: isState$1(row.state) ? row.state : "garage",
 		garage: row.garage,
 		fuel: row.fuel,
@@ -14799,6 +14942,7 @@ const vehicles = new class {
 			owner,
 			model,
 			props: null,
+			setup: null,
 			state,
 			garage,
 			fuel: 100,
@@ -14820,8 +14964,9 @@ const vehicles = new class {
 		if (!vehicle) return;
 		Object.assign(vehicle, change);
 		let v = { ...vehicle };
-		this.writes.push(`update ${id}`, () => mysql.query("UPDATE ai_vehicles_owned SET props = ?, state = ?, garage = ?, fuel = ?, engine = ?, body = ? WHERE id = ?", [
+		this.writes.push(`update ${id}`, () => mysql.query("UPDATE ai_vehicles_owned SET props = ?, setup = ?, state = ?, garage = ?, fuel = ?, engine = ?, body = ? WHERE id = ?", [
 			v.props ? JSON.stringify(v.props) : null,
+			v.setup ? JSON.stringify(v.setup) : null,
 			v.state,
 			v.garage,
 			v.fuel,
@@ -14868,13 +15013,14 @@ const vehicles = new class {
 			...vehicle.props,
 			plate: vehicle.plate
 		});
-		let entity = await spawnVehicle$1({
+		let setup = vehicle.props ? null : toVehicleSetup(vehicle.setup), entity = await spawnVehicle$1({
 			model: vehicle.model,
 			coords: at,
 			asker,
 			plate: vehicle.plate,
 			fuel: vehicle.fuel,
 			bags,
+			...setup ? { setup } : {},
 			keysTo: asker,
 			purpose
 		});
@@ -14918,15 +15064,27 @@ function createVehicle(owner, model, garage, props, state = "garage") {
 	} }), vehicle;
 }
 const clamp = (v, min, max) => typeof v == "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : void 0;
-function saveVehicle(id, change) {
+function saveVehicle(id, change, tuning = !1) {
 	let vehicle = vehicles.get(id);
 	if (!vehicle) return;
-	let props = change.props === void 0 ? null : toVehicleProps(change.props), fuel = clamp(change.fuel, 0, 100), engine = clamp(change.engine, -4e3, 1e3), body = clamp(change.body, 0, 1e3);
+	let props = change.props === void 0 ? null : toVehicleProps(change.props), stored = toVehicleProps(vehicle.props), fuel = clamp(change.fuel, 0, 100), engine = clamp(change.engine, -4e3, 1e3), body = clamp(change.body, 0, 1e3);
 	vehicles.update(id, {
-		...props ? { props: {
-			...props,
-			plate: vehicle.plate
-		} } : {},
+		...props ? {
+			props: {
+				...props,
+				...tuning ? {} : {
+					mods: stored?.mods ?? {},
+					neon: stored?.neon ?? [
+						!1,
+						!1,
+						!1,
+						!1
+					]
+				},
+				plate: vehicle.plate
+			},
+			setup: null
+		} : {},
 		...fuel === void 0 ? {} : { fuel },
 		...engine === void 0 ? {} : { engine },
 		...body === void 0 ? {} : { body },
@@ -14934,8 +15092,9 @@ function saveVehicle(id, change) {
 		...change.garage === void 0 ? {} : { garage: change.garage }
 	});
 }
-function spawnVehicle(id, at, asker, purpose = "garage") {
-	return world.spawn(id, at, asker, purpose);
+function spawnVehicle(id, at, asker, purpose = "garage", setup) {
+	let vehicle = vehicles.get(id), parsed = setup === void 0 ? null : toVehicleSetup(setup);
+	return vehicle && parsed && !vehicle.props && vehicles.update(id, { setup: parsed }), world.spawn(id, at, asker, purpose);
 }
 function storeVehicle(id, garage, state = "garage") {
 	world.despawn(id), vehicles.update(id, {
@@ -14962,6 +15121,8 @@ registerExport("CreateVehicle", (owner, model, garage, props) => {
 		state: isState(change.state) ? change.state : void 0,
 		garage: typeof change.garage == "string" ? change.garage : void 0
 	});
+}), registerExport("SaveTuning", (id, props) => {
+	typeof id == "number" && saveVehicle(id, { props }, !0);
 }), registerExport("StoreVehicle", (id, garage, state) => {
 	typeof id == "number" && storeVehicle(id, typeof garage == "string" ? garage : null, isState(state) ? state : "garage");
 }), registerExport("SetOwner", (id, owner) => {
@@ -14969,7 +15130,7 @@ registerExport("CreateVehicle", (owner, model, garage, props) => {
 	typeof id == "number" && o && vehicles.setOwner(id, o);
 }), registerExport("DeleteVehicle", (id) => {
 	typeof id == "number" && (world.despawn(id), vehicles.remove(id));
-}), registerExport("SpawnVehicle", (id, at, asker, cb, purpose) => {
+}), registerExport("SpawnVehicle", (id, at, asker, cb, purpose, setup) => {
 	if (typeof id != "number" || !isRecord(at) || typeof asker != "number") return;
 	let [x, y, z] = [
 		readFinite(at.x),
@@ -14981,7 +15142,7 @@ registerExport("CreateVehicle", (owner, model, garage, props) => {
 		y,
 		z,
 		heading: readFinite(at.heading ?? at.w) ?? 0
-	}, asker, toKeyPurpose(purpose ?? "garage")).then((netId) => {
+	}, asker, toKeyPurpose(purpose ?? "garage"), setup ?? void 0).then((netId) => {
 		typeof cb == "function" && cb(netId);
 	});
 });
@@ -15049,7 +15210,7 @@ const qbx = {
 			props: options.props,
 			state,
 			garage: typeof options.garage == "string" ? options.garage : void 0
-		}), !0;
+		}, !0), !0;
 	}
 };
 for (let [name, fn] of Object.entries(qbx)) provideExport("qbx_vehicles", name, fn);

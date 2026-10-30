@@ -1,4 +1,8 @@
-import { isRecord, toVehicleProps } from "@aicore-fivem/lib/shared";
+import {
+  isRecord,
+  toVehicleProps,
+  toVehicleSetup,
+} from "@aicore-fivem/lib/shared";
 import type { KeyPurpose } from "@aicore-fivem/shared";
 import type { OwnedVehicle, Owner, VehicleState } from "common/vehicles";
 import { vehicles } from "./store";
@@ -47,7 +51,11 @@ const clamp = (v: unknown, min: number, max: number): number | undefined =>
     ? Math.min(max, Math.max(min, v))
     : undefined;
 
-/** Saves what a client read from the entity (props) and the damage / fuel it reports. */
+/**
+ * Saves condition and look. Without `tuning` the stored `mods` and `neon` stay (none without stored props): only a
+ * tuning shop (`SaveTuning`, ai-mechanic) changes them, so a client-read look never persists a mod menu's work. Stored
+ * props end the vehicle's spawn setup (the props carry its colours now).
+ */
 export function saveVehicle(
   id: number,
   change: {
@@ -58,16 +66,32 @@ export function saveVehicle(
     state?: VehicleState;
     garage?: string | null;
   },
+  tuning = false,
 ): void {
   const vehicle = vehicles.get(id);
   if (!vehicle) return;
   const props =
     change.props === undefined ? null : toVehicleProps(change.props);
+  const stored = toVehicleProps(vehicle.props);
   const fuel = clamp(change.fuel, 0, 100);
   const engine = clamp(change.engine, -4000, 1000);
   const body = clamp(change.body, 0, 1000);
   vehicles.update(id, {
-    ...(props ? { props: { ...props, plate: vehicle.plate } } : {}),
+    ...(props
+      ? {
+          props: {
+            ...props,
+            ...(tuning
+              ? {}
+              : {
+                  mods: stored?.mods ?? {},
+                  neon: stored?.neon ?? [false, false, false, false],
+                }),
+            plate: vehicle.plate,
+          },
+          setup: null,
+        }
+      : {}),
     ...(fuel !== undefined ? { fuel } : {}),
     ...(engine !== undefined ? { engine } : {}),
     ...(body !== undefined ? { body } : {}),
@@ -76,12 +100,21 @@ export function saveVehicle(
   });
 }
 
+/**
+ * Spawns the vehicle. A `setup` given to a vehicle without props is kept and applied on every spawn until its first
+ * props save (a bought colour survives a vehicle that was never parked).
+ */
 export function spawnVehicle(
   id: number,
   at: SpawnPoint,
   asker: number,
   purpose: KeyPurpose = "garage",
+  setup?: unknown,
 ): Promise<number | null> {
+  const vehicle = vehicles.get(id);
+  const parsed = setup === undefined ? null : toVehicleSetup(setup);
+  if (vehicle && parsed && !vehicle.props)
+    vehicles.update(id, { setup: parsed });
   return world.spawn(id, at, asker, purpose);
 }
 

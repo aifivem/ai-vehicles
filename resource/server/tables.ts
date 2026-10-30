@@ -9,6 +9,7 @@ export type Tables = {
     owner_id: string;
     model: string;
     props: string | null;
+    setup: string | null;
     state: string;
     garage: string | null;
     fuel: number;
@@ -27,6 +28,7 @@ export type TableInserts = {
     owner_id: string;
     model: string;
     props?: string | null;
+    setup?: string | null;
     state?: string;
     garage?: string | null;
     fuel?: number;

@@ -60,6 +60,9 @@ registerExport("SaveVehicle", (id: unknown, change: unknown) => {
     garage: typeof change.garage === "string" ? change.garage : undefined,
   });
 });
+registerExport("SaveTuning", (id: unknown, props: unknown) => {
+  if (typeof id === "number") saveVehicle(id, { props }, true);
+});
 registerExport(
   "StoreVehicle",
   (id: unknown, garage: unknown, state: unknown) => {
@@ -88,6 +91,7 @@ registerExport(
     asker: unknown,
     cb: unknown,
     purpose?: unknown,
+    setup?: unknown,
   ) => {
     if (typeof id !== "number" || !isRecord(at) || typeof asker !== "number")
       return;
@@ -100,11 +104,15 @@ registerExport(
       z,
       heading: readFinite(at.heading ?? at.w) ?? 0,
     };
-    void spawnVehicle(id, point, asker, toKeyPurpose(purpose ?? "garage")).then(
-      (netId) => {
-        if (typeof cb === "function") cb(netId);
-      },
-    );
+    void spawnVehicle(
+      id,
+      point,
+      asker,
+      toKeyPurpose(purpose ?? "garage"),
+      setup ?? undefined,
+    ).then((netId) => {
+      if (typeof cb === "function") cb(netId);
+    });
   },
 );
 
@@ -195,11 +203,16 @@ const qbx: Record<string, (...args: unknown[]) => unknown> = {
           : options.state === 2
             ? "impound"
             : undefined;
-    saveVehicle(id, {
-      props: options.props,
-      state,
-      garage: typeof options.garage === "string" ? options.garage : undefined,
-    });
+    // Qbox scripts save the full client props on park (tuning scripts rely on it): the stand-in keeps them whole.
+    saveVehicle(
+      id,
+      {
+        props: options.props,
+        state,
+        garage: typeof options.garage === "string" ? options.garage : undefined,
+      },
+      true,
+    );
     return true;
   },
 };

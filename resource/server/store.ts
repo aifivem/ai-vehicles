@@ -1,6 +1,6 @@
 import { mysql } from "@aicore-fivem/mysql";
 import { WriteQueue } from "@aicore-fivem/lib/server";
-import { toVehicleProps } from "@aicore-fivem/lib/shared";
+import { toVehicleProps, toVehicleSetup } from "@aicore-fivem/lib/shared";
 import {
   plateOf,
   type OwnedVehicle,
@@ -17,6 +17,7 @@ interface Row {
   owner_id: string;
   model: string;
   props: string | null;
+  setup: string | null;
   state: string;
   garage: string | null;
   fuel: number;
@@ -33,8 +34,10 @@ const isState = (v: string): v is VehicleState =>
 function fromRow(row: Row): OwnedVehicle | null {
   if (!isOwnerType(row.owner_type)) return null;
   let props = null;
+  let setup = null;
   try {
     props = row.props ? toVehicleProps(JSON.parse(row.props)) : null;
+    setup = row.setup ? toVehicleSetup(JSON.parse(row.setup)) : null;
   } catch (error) {
     log.error(`vehicle ${row.id} has broken props`, error);
   }
@@ -44,6 +47,7 @@ function fromRow(row: Row): OwnedVehicle | null {
     owner: { type: row.owner_type, id: row.owner_id },
     model: row.model,
     props,
+    setup,
     state: isState(row.state) ? row.state : "garage",
     garage: row.garage,
     fuel: row.fuel,
@@ -146,6 +150,7 @@ class VehicleStore {
       owner,
       model,
       props: null,
+      setup: null,
       state,
       garage,
       fuel: 100,
@@ -167,7 +172,7 @@ class VehicleStore {
     change: Partial<
       Pick<
         OwnedVehicle,
-        "props" | "state" | "garage" | "fuel" | "engine" | "body"
+        "props" | "setup" | "state" | "garage" | "fuel" | "engine" | "body"
       >
     >,
   ): void {
@@ -177,9 +182,10 @@ class VehicleStore {
     const v = { ...vehicle };
     this.writes.push(`update ${id}`, () =>
       mysql.query(
-        "UPDATE ai_vehicles_owned SET props = ?, state = ?, garage = ?, fuel = ?, engine = ?, body = ? WHERE id = ?",
+        "UPDATE ai_vehicles_owned SET props = ?, setup = ?, state = ?, garage = ?, fuel = ?, engine = ?, body = ? WHERE id = ?",
         [
           v.props ? JSON.stringify(v.props) : null,
+          v.setup ? JSON.stringify(v.setup) : null,
           v.state,
           v.garage,
           v.fuel,

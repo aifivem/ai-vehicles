@@ -1,4 +1,5 @@
 import { spawnVehicle } from "@aicore-fivem/lib/server";
+import { toVehicleSetup } from "@aicore-fivem/lib/shared";
 import type { KeyPurpose } from "@aicore-fivem/shared";
 import { BAGS } from "common/vehicles";
 import { log } from "./log";
@@ -41,6 +42,7 @@ class World {
     const bags: Record<string, unknown> = { [BAGS.owned]: true, [BAGS.id]: id };
     if (vehicle.props)
       bags[BAGS.props] = { ...vehicle.props, plate: vehicle.plate };
+    const setup = vehicle.props ? null : toVehicleSetup(vehicle.setup);
     // Whoever takes it out gets the keys from the active key system (ai-vehiclekeys also knows owners by itself).
     const entity = await spawnVehicle({
       model: vehicle.model,
@@ -49,6 +51,7 @@ class World {
       plate: vehicle.plate,
       fuel: vehicle.fuel,
       bags,
+      ...(setup ? { setup } : {}),
       keysTo: asker,
       purpose,
     });
