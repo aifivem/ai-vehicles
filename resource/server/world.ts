@@ -1,4 +1,5 @@
 import { triggerClientCallback, vehicleKeys } from "@aicore-fivem/lib/server";
+import type { KeyPurpose } from "@aicore-fivem/shared";
 import { waitFor } from "@aicore-fivem/lib/shared";
 import { BAGS, EVENTS } from "common/vehicles";
 import { log } from "./log";
@@ -41,7 +42,7 @@ class World {
   }
 
   /** Creates the vehicle on the server (strict lockdown), marks it with its state bags and puts it "out". */
-  async spawn(id: number, at: SpawnPoint, asker: number): Promise<number | null> {
+  async spawn(id: number, at: SpawnPoint, asker: number, purpose: KeyPurpose): Promise<number | null> {
     const vehicle = vehicles.get(id);
     if (!vehicle || this.entityOf(id)) return null;
     const type = await this.typeOf(vehicle.model, asker);
@@ -62,7 +63,7 @@ class World {
     this.byEntity.set(entity, id);
     vehicles.update(id, { state: "out", garage: null });
     // Whoever takes it out gets the keys from the active key system (ai-vehiclekeys also knows owners by itself).
-    vehicleKeys.give(asker, entity);
+    vehicleKeys.give(asker, entity, purpose);
     return NetworkGetNetworkIdFromEntity(entity);
   }
 

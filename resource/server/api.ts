@@ -1,4 +1,5 @@
 import { isRecord, toVehicleProps } from "@aicore-fivem/lib/shared";
+import type { KeyPurpose } from "@aicore-fivem/shared";
 import type { OwnedVehicle, Owner, VehicleState } from "common/vehicles";
 import { vehicles } from "./store";
 import { world, type SpawnPoint } from "./world";
@@ -45,8 +46,8 @@ export function saveVehicle(id: number, change: { props?: unknown; fuel?: unknow
   });
 }
 
-export function spawnVehicle(id: number, at: SpawnPoint, asker: number): Promise<number | null> {
-  return world.spawn(id, at, asker);
+export function spawnVehicle(id: number, at: SpawnPoint, asker: number, purpose: KeyPurpose = "garage"): Promise<number | null> {
+  return world.spawn(id, at, asker, purpose);
 }
 
 /** Parks a vehicle: out of the world, into a garage (or the impound). */

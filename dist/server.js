@@ -42,6 +42,10 @@ const CORE = {
 	clientPromptPressedEvent: "ai-core:client:promptPressed",
 	/** (key: keyof PlayerCache, value) a cached value of the local player changed (one watcher in ai-core for every resource). */
 	clientCacheEvent: "ai-core:client:cache",
+	/** Server -> client callback: (model: string) the `CreateVehicleServerSetter` type of a model, null when the game has no such vehicle (ai-core's client answers for every resource, lib `spawnVehicle`). */
+	vehicleTypeCallback: "ai-core:vehicleType",
+	/** GlobalState: "prompt" | "target", how lib `Points` let players interact (ai-core panel setting). */
+	interactionStateKey: "ai:interaction",
 	charactersCallback: "ai-core:characters",
 	createCharacterCallback: "ai-core:createCharacter",
 	deleteCharacterCallback: "ai-core:deleteCharacter",
@@ -53,6 +57,19 @@ const CORE = {
 	/** Server -> client: () the character was let go (switch); show the character screen again. */
 	openCharactersEvent: "ai-core:client:openCharacters"
 };
+
+// ../../../packages/shared/src/vehicleKeys.ts
+const KEY_PURPOSES = [
+	"purchase",
+	"garage",
+	"job",
+	"rental",
+	"temporary"
+];
+/** A purpose from untrusted input; `temporary` for anything else. */
+function toKeyPurpose(value) {
+	return KEY_PURPOSES.find((p) => p === value) ?? "temporary";
+}
 
 // ../../../packages/shared/src/vehicles.ts
 /** Entity state bags ai-vehicles sets on a spawned owned vehicle. */
@@ -233,6 +250,7 @@ const responseEvent = (resource) => `aicore:cbr:${resource}`;
 const DEFAULT_CALLBACK_TIMEOUT = 3e4;
 
 // ../../../packages/lib/src/server/gate.ts
+const core$8 = resourceExport(CORE.resource);
 const log$5 = createLogger(GetCurrentResourceName());
 /** Every gate of this resource; one playerDropped listener frees them all (one listener per gate trips Node's limit). */
 const gates = /* @__PURE__ */ new Set();
@@ -273,6 +291,7 @@ function triggerClientCallback(name, source, args = [], timeoutMs = DEFAULT_CALL
 }
 
 // ../../../packages/lib/src/server/admin/validate.ts
+const core$7 = resourceExport(CORE.resource);
 /** Values of a lookup list from ai-core (items, jobs, gangs, accounts), cached for 2 s; null = not known (accepted). */
 var LookupCache = class {
 	lists = /* @__PURE__ */ new Map();
@@ -281,7 +300,7 @@ var LookupCache = class {
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = resourceExport(CORE.resource).GetLookupValues(source);
+			list = core$7.GetLookupValues(source);
 		} catch {}
 		const values = new Set(Array.isArray(list) ? list.filter((v) => typeof v === "string") : []);
 		this.lists.set(source, {
@@ -293,7 +312,14 @@ var LookupCache = class {
 };
 const lookups = new LookupCache();
 
+// ../../../packages/lib/src/server/admin/panel.ts
+const core$6 = resourceExport(CORE.resource);
+
+// ../../../packages/lib/src/server/inventory.ts
+const core$5 = resourceExport(CORE.resource);
+
 // ../../../packages/lib/src/server/online.ts
+const core$4 = resourceExport(CORE.resource);
 /**
 * This resource's mirror of ai-core's loaded players: characters, job and gang names and duty, read once from ai-core's
 * exports on first use and then kept by its local events. Hot paths (every chat message, every alert) read it
@@ -306,10 +332,9 @@ var OnlinePlayers = class {
 	start() {
 		if (this.started) return;
 		this.started = true;
-		const core = resourceExport(CORE.resource);
 		const load = (source, character) => {
-			this.put(source, character, (core.GetJobs(source) ?? []).map((m) => m.job), (core.GetGangs(source) ?? []).map((m) => m.gang));
-			this.setDuty(source, core.GetDutyJob(source));
+			this.put(source, character, (core$4.GetJobs(source) ?? []).map((m) => m.job), (core$4.GetGangs(source) ?? []).map((m) => m.gang));
+			this.setDuty(source, core$4.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load);
 		on(CORE.playerUnloadedEvent, (source) => this.drop(source));
@@ -322,8 +347,8 @@ var OnlinePlayers = class {
 			if (player) player.gangs = gangs.map((m) => m.gang);
 		});
 		on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (const source of core.GetLoadedSources()) {
-			const character = core.GetCharacter(source);
+		for (const source of core$4.GetLoadedSources()) {
+			const character = core$4.GetCharacter(source);
 			if (character) load(source, character);
 		}
 	}
@@ -383,91 +408,33 @@ var OnlinePlayers = class {
 	/** Players on duty for a job (a live set: copy before awaiting). */
 	onDutyFor(job) {
 		this.start();
-		return this.onDuty.get(job) ?? EMPTY$1;
+		return this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY$1 = /* @__PURE__ */ new Set();
+const EMPTY = /* @__PURE__ */ new Set();
 const online = new OnlinePlayers();
 
 // ../../../packages/lib/src/server/vehicleKeys.ts
-const core$2 = () => resourceExport(CORE.resource);
+const core$3 = resourceExport(CORE.resource);
 /**
 * Vehicle keys through ai-core's key layer: the active key system (ai-vehiclekeys, or another the panel picks) answers.
-* A vehicle is a server entity handle or a plate.
+* A vehicle is a server entity handle or a plate; `purpose` tells the key system why the player gets it (`KeyPurpose`).
 */
 const vehicleKeys = {
-	/** Gives a player the keys of a vehicle. */
-	give: (source, vehicle) => core$2().GiveVehicleKeys(source, vehicle),
+	/** Gives a player the keys of a vehicle; `purpose` defaults to `temporary`. */
+	give: (source, vehicle, purpose = "temporary") => core$3.GiveVehicleKeys(source, vehicle, purpose),
 	/** Takes a player's keys of a vehicle. */
-	remove: (source, vehicle) => core$2().RemoveVehicleKeys(source, vehicle),
+	remove: (source, vehicle) => core$3.RemoveVehicleKeys(source, vehicle),
 	/** Whether a player holds the keys; true when the key system cannot tell or none runs. */
-	has: (source, vehicle) => core$2().HasVehicleKeys(source, vehicle)
+	has: (source, vehicle) => core$3.HasVehicleKeys(source, vehicle)
 };
 
 // ../../../packages/lib/src/server/proximity.ts
 /**
-* Who is near whom without scanning every player: OneSync tells the server which players are in each other's scope
-* (`playerEnteredScope` / `playerLeftScope`, ~424 m). A "near" question only measures the few players in scope
-* instead of all 10k online. Players already in scope when the resource starts are found once from a 424 m grid.
+* Who is near whom without scanning every player: ai-core keeps which players are in each other's OneSync scope
+* (~424 m, one set of scope handlers for the whole server); a "near" question measures only those few players.
 */
-const SCOPE_RADIUS = 424;
-const posOf = (source) => {
-	const [x = 0, y = 0, z = 0] = GetEntityCoords(GetPlayerPed(String(source)));
-	return {
-		x,
-		y,
-		z
-	};
-};
-var Scopes = class {
-	scopes = /* @__PURE__ */ new Map();
-	started = false;
-	link(a, b) {
-		let set = this.scopes.get(a);
-		if (!set) this.scopes.set(a, set = /* @__PURE__ */ new Set());
-		set.add(b);
-	}
-	start() {
-		if (this.started) return;
-		this.started = true;
-		on("playerEnteredScope", (data) => this.link(Number(data.for), Number(data.player)));
-		on("playerLeftScope", (data) => this.scopes.get(Number(data.for))?.delete(Number(data.player)));
-		on("playerDropped", () => {
-			const source = Number(globalThis.source);
-			for (const other of this.scopes.get(source) ?? []) this.scopes.get(other)?.delete(source);
-			this.scopes.delete(source);
-		});
-		this.seed();
-	}
-	/** The players in scope of each other right now: a grid of scope-sized cells, each player against 9 cells. */
-	seed() {
-		const cells = /* @__PURE__ */ new Map();
-		const all = [];
-		for (let i = 0; i < GetNumPlayerIndices(); i++) {
-			const source = Number(GetPlayerFromIndex(i));
-			const entry = {
-				source,
-				p: posOf(source)
-			};
-			all.push(entry);
-			const key = `${Math.floor(entry.p.x / SCOPE_RADIUS)}:${Math.floor(entry.p.y / SCOPE_RADIUS)}`;
-			const cell = cells.get(key);
-			if (cell) cell.push(entry);
-			else cells.set(key, [entry]);
-		}
-		for (const { source, p } of all) {
-			const cx = Math.floor(p.x / SCOPE_RADIUS);
-			const cy = Math.floor(p.y / SCOPE_RADIUS);
-			for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const other of cells.get(`${cx + dx}:${cy + dy}`) ?? []) if (other.source !== source && Math.hypot(other.p.x - p.x, other.p.y - p.y) <= SCOPE_RADIUS) this.link(source, other.source);
-		}
-	}
-	of(source) {
-		this.start();
-		return this.scopes.get(source) ?? EMPTY;
-	}
-};
-const EMPTY = /* @__PURE__ */ new Set();
-const scopes = new Scopes();
+const core$2 = resourceExport(CORE.resource);
 
 // ../../../packages/lib/src/server/command.ts
 const resource$3 = GetCurrentResourceName();
@@ -25271,7 +25238,7 @@ var World = class {
 		return type;
 	}
 	/** Creates the vehicle on the server (strict lockdown), marks it with its state bags and puts it "out". */
-	async spawn(id, at, asker) {
+	async spawn(id, at, asker, purpose) {
 		const vehicle = vehicles.get(id);
 		if (!vehicle || this.entityOf(id)) return null;
 		const type = await this.typeOf(vehicle.model, asker);
@@ -25296,7 +25263,7 @@ var World = class {
 			state: "out",
 			garage: null
 		});
-		vehicleKeys.give(asker, entity);
+		vehicleKeys.give(asker, entity, purpose);
 		return NetworkGetNetworkIdFromEntity(entity);
 	}
 	/** Takes the vehicle out of the world (parking); the caller sets the new state. */
@@ -25366,8 +25333,8 @@ function saveVehicle(id, change) {
 		...change.garage !== void 0 ? { garage: change.garage } : {}
 	});
 }
-function spawnVehicle(id, at, asker) {
-	return world.spawn(id, at, asker);
+function spawnVehicle(id, at, asker, purpose = "garage") {
+	return world.spawn(id, at, asker, purpose);
 }
 /** Parks a vehicle: out of the world, into a garage (or the impound). */
 function storeVehicle(id, garage, state = "garage") {
@@ -25419,7 +25386,7 @@ registerExport("DeleteVehicle", (id) => {
 	world.despawn(id);
 	vehicles.remove(id);
 });
-registerExport("SpawnVehicle", (id, at, asker, cb) => {
+registerExport("SpawnVehicle", (id, at, asker, cb, purpose) => {
 	if (typeof id !== "number" || !isRecord(at) || typeof asker !== "number") return;
 	const point = {
 		x: Number(at.x),
@@ -25427,7 +25394,7 @@ registerExport("SpawnVehicle", (id, at, asker, cb) => {
 		z: Number(at.z),
 		heading: Number(at.heading ?? at.w ?? 0)
 	};
-	spawnVehicle(id, point, asker).then((netId) => {
+	spawnVehicle(id, point, asker, toKeyPurpose(purpose ?? "garage")).then((netId) => {
 		if (typeof cb === "function") cb(netId);
 	});
 });

@@ -1,5 +1,6 @@
 import { provideExport, registerExport, resourceExport } from "@aicore-fivem/lib/server";
 import { isRecord } from "@aicore-fivem/lib/shared";
+import { toKeyPurpose } from "@aicore-fivem/shared";
 import type { OwnedVehicle, VehicleState } from "common/vehicles";
 import { createVehicle, find, saveVehicle, spawnVehicle, storeVehicle, toOwner } from "./api";
 import { vehicles } from "./store";
@@ -39,10 +40,10 @@ registerExport("DeleteVehicle", (id: unknown) => {
   world.despawn(id);
   vehicles.remove(id);
 });
-registerExport("SpawnVehicle", (id: unknown, at: unknown, asker: unknown, cb: unknown) => {
+registerExport("SpawnVehicle", (id: unknown, at: unknown, asker: unknown, cb: unknown, purpose?: unknown) => {
   if (typeof id !== "number" || !isRecord(at) || typeof asker !== "number") return;
   const point = { x: Number(at.x), y: Number(at.y), z: Number(at.z), heading: Number(at.heading ?? at.w ?? 0) };
-  void spawnVehicle(id, point, asker).then((netId) => {
+  void spawnVehicle(id, point, asker, toKeyPurpose(purpose ?? "garage")).then((netId) => {
     if (typeof cb === "function") cb(netId);
   });
 });
