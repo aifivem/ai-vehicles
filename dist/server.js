@@ -14,6 +14,10 @@ function waitFor(check, timeoutMs = 1e4, intervalMs = 0) {
 		poll();
 	});
 }
+// ../../../packages/lib/src/shared/strict.ts
+function readFinite(value) {
+	return typeof value == "number" && Number.isFinite(value) ? value : null;
+}
 // ../../../packages/lib/src/shared/vehicleProps.ts
 const isObj = (v) => typeof v == "object" && !!v && !Array.isArray(v), nums = (v, n) => Array.isArray(v) && v.length === n && v.every((x) => typeof x == "number") ? v : null;
 function toVehicleProps(v) {
@@ -97,7 +101,7 @@ const CORE = {
 	clientPlayerLoadedEvent: "ai-core:client:playerLoaded",
 	clientPlayerUnloadedEvent: "ai-core:client:playerUnloaded",
 	clientCharacterPortraitEvent: "ai-core:client:characterPortrait",
-	clientCharacterLookEvent: "ai-core:client:characterLook",
+	characterLooksEvent: "ai-core:client:characterLooks",
 	clientPromptPressedEvent: "ai-core:client:promptPressed",
 	clientCacheEvent: "ai-core:client:cache",
 	clientHudVisibleEvent: "ai-core:client:hudVisible",
@@ -275,10 +279,7 @@ var OnlinePlayers = class {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY = new Set();
-new OnlinePlayers();
-// ../../../packages/lib/src/server/vehicleKeys.ts
-const core$11 = resourceExport(CORE.resource), vehicleKeys = {
+const EMPTY = new Set(), online = new OnlinePlayers(), core$11 = resourceExport(CORE.resource), vehicleKeys = {
 	give: (source, vehicle, purpose = "temporary") => core$11.GiveVehicleKeys(source, vehicle, purpose),
 	remove: (source, vehicle) => core$11.RemoveVehicleKeys(source, vehicle),
 	has: (source, vehicle) => core$11.HasVehicleKeys(source, vehicle)
@@ -306,8 +307,14 @@ async function seatPlayer(vehicle, source, seat) {
 		SetPedIntoVehicle(ped, vehicle, seat);
 	}, 2e3, 150).catch(() => !1) : !1;
 }
-function randomPlate() {
-	let digit = () => String(Math.floor(Math.random() * 10)), letter = () => "ABCDEFGHJKLMNPRSTUVWXYZ"[Math.floor(Math.random() * 23)] ?? "A";
+function randomPlate(prefix) {
+	let digit = () => String(Math.floor(Math.random() * 10));
+	if (prefix !== void 0) {
+		let plate = prefix.slice(0, 8);
+		for (; plate.length < 8;) plate += digit();
+		return plate;
+	}
+	let letter = () => "ABCDEFGHJKLMNPRSTUVWXYZ"[Math.floor(Math.random() * 23)] ?? "A";
 	return `${digit()}${digit()}${letter()}${letter()}${letter()}${digit()}${digit()}${digit()}`;
 }
 async function spawnVehicle$1(options) {
@@ -331,7 +338,45 @@ async function spawnVehicle$1(options) {
 	}], ...options.seats ?? []];
 	return await Promise.all(riders.map((r) => seatPlayer(vehicle, r.source, r.seat))), vehicle;
 }
-resourceExport(CORE.resource), createLogger(GetCurrentResourceName());
+resourceExport(CORE.resource);
+// ../../../packages/lib/src/server/players.ts
+const log$4 = createLogger(GetCurrentResourceName()), dropped = new Set();
+let listening = !1;
+function onDropped(fn) {
+	listening || (listening = !0, on("playerDropped", () => {
+		let source = Number(globalThis.source);
+		for (let handler of dropped) handler(source);
+	})), dropped.add(fn);
+}
+function onCharacter(handlers) {
+	let live = new Map(), deliver = (source, character) => {
+		if (live.set(source, character.id), handlers.loaded) try {
+			let result = handlers.loaded(source, character);
+			result instanceof Promise && result.catch((error) => log$4.error(`character loaded handler failed for ${source}`, error));
+		} catch (error) {
+			log$4.error(`character loaded handler failed for ${source}`, error);
+		}
+	}, end = (source, charId) => {
+		if (live.delete(source)) try {
+			handlers.unloaded?.(source, charId);
+		} catch (error) {
+			log$4.error(`character unloaded handler failed for ${source}`, error);
+		}
+	};
+	on(CORE.playerLoadedEvent, (source, character) => {
+		let previous = live.get(source);
+		previous !== void 0 && end(source, previous), deliver(source, character);
+	}), on(CORE.playerUnloadedEvent, (source, charId) => end(source, charId)), onDropped((source) => setImmediate(() => {
+		let charId = live.get(source);
+		charId !== void 0 && end(source, charId);
+	})), setImmediate(() => {
+		for (let source of online.sources()) {
+			if (live.has(source)) continue;
+			let character = online.character(source);
+			character && deliver(source, character);
+		}
+	});
+}
 // ../../../packages/lib/src/server/command.ts
 const resource$3 = GetCurrentResourceName();
 createLogger(resource$3), new class {
@@ -14656,7 +14701,7 @@ async function createDatabaseTables(resource, file) {
 		else for (let [name, definition] of statement.columns) columns.has(name) || (await mysql.query(`ALTER TABLE \`${statement.table}\` ADD COLUMN ${definition}`), log$1.info(`^2added column ${statement.table}.${name}^7 (${resource})`));
 	}
 }
-IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
+IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/index.ts
 var WriteQueue = class {
 	onError;
@@ -14899,7 +14944,7 @@ function storeVehicle(id, garage, state = "garage") {
 	});
 }
 // resource/server/exports.ts
-const core$1 = resourceExport("ai-core"), isState = (v) => v === "garage" || v === "out" || v === "impound";
+const core = resourceExport("ai-core"), isState = (v) => v === "garage" || v === "out" || v === "impound";
 registerExport("CreateVehicle", (owner, model, garage, props) => {
 	let o = toOwner(owner);
 	if (!o || typeof model != "string") return null;
@@ -14925,17 +14970,23 @@ registerExport("CreateVehicle", (owner, model, garage, props) => {
 }), registerExport("DeleteVehicle", (id) => {
 	typeof id == "number" && (world.despawn(id), vehicles.remove(id));
 }), registerExport("SpawnVehicle", (id, at, asker, cb, purpose) => {
-	typeof id == "number" && isRecord(at) && typeof asker == "number" && spawnVehicle(id, {
-		x: Number(at.x),
-		y: Number(at.y),
-		z: Number(at.z),
-		heading: Number(at.heading ?? at.w ?? 0)
+	if (typeof id != "number" || !isRecord(at) || typeof asker != "number") return;
+	let [x, y, z] = [
+		readFinite(at.x),
+		readFinite(at.y),
+		readFinite(at.z)
+	];
+	x !== null && y !== null && z !== null && spawnVehicle(id, {
+		x,
+		y,
+		z,
+		heading: readFinite(at.heading ?? at.w) ?? 0
 	}, asker, toKeyPurpose(purpose ?? "garage")).then((netId) => {
 		typeof cb == "function" && cb(netId);
 	});
 });
 function qbxView(v) {
-	let source = v.owner.type === "character" ? core$1.GetSourceByCharId(Number(v.owner.id)) : null, citizenid = source === null ? null : core$1.GetCharacter(source)?.citizenid ?? null;
+	let source = v.owner.type === "character" ? core.GetSourceByCharId(Number(v.owner.id)) : null, citizenid = source === null ? null : core.GetCharacter(source)?.citizenid ?? null;
 	return {
 		id: v.id,
 		citizenid,
@@ -14948,7 +14999,7 @@ function qbxView(v) {
 }
 function charIdOf(citizenid) {
 	if (typeof citizenid != "string") return null;
-	let source = core$1.GetSourceByCitizenId(citizenid), id = source === null ? void 0 : core$1.GetCharacter(source)?.id;
+	let source = core.GetSourceByCitizenId(citizenid), id = source === null ? void 0 : core.GetCharacter(source)?.id;
 	return id === void 0 ? null : String(id);
 }
 const qbx = {
@@ -15003,15 +15054,11 @@ const qbx = {
 };
 for (let [name, fn] of Object.entries(qbx)) provideExport("qbx_vehicles", name, fn);
 // resource/server/index.ts
-const core = resourceExport("ai-core"), characterOwner = (id) => ({
+const characterOwner = (id) => ({
 	type: "character",
 	id: String(id)
 });
-on(CORE.playerLoadedEvent, (_source, character) => {
-	vehicles.loadOwner(characterOwner(character.id)).catch((error) => log.error(`loading vehicles of character ${character.id} failed`, error));
-}), on(CORE.playerUnloadedEvent, (_source, charId) => vehicles.unloadOwner(characterOwner(charId), (id) => world.has(id))), createDatabaseTables(ResourceName, "sql/main.sql").then(() => vehicles.init()).then(async () => {
-	for (let source of core.GetLoadedSources()) {
-		let character = core.GetCharacter(source);
-		character && await vehicles.loadOwner(characterOwner(character.id));
-	}
-}).catch((error) => log.error("database setup failed", error));
+createDatabaseTables(ResourceName, "sql/main.sql").then(() => vehicles.init()).then(() => onCharacter({
+	loaded: (_source, character) => vehicles.loadOwner(characterOwner(character.id)).catch((error) => log.error(`loading vehicles of character ${character.id} failed`, error)),
+	unloaded: (_source, charId) => vehicles.unloadOwner(characterOwner(charId), (id) => world.has(id))
+})).catch((error) => log.error("database setup failed", error));

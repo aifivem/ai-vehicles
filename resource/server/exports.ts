@@ -3,7 +3,7 @@ import {
   registerExport,
   resourceExport,
 } from "@aicore-fivem/lib/server";
-import { isRecord } from "@aicore-fivem/lib/shared";
+import { isRecord, readFinite } from "@aicore-fivem/lib/shared";
 import { toKeyPurpose } from "@aicore-fivem/shared";
 import type { OwnedVehicle, VehicleState } from "common/vehicles";
 import {
@@ -91,11 +91,14 @@ registerExport(
   ) => {
     if (typeof id !== "number" || !isRecord(at) || typeof asker !== "number")
       return;
+    const [x, y, z] = [readFinite(at.x), readFinite(at.y), readFinite(at.z)];
+    // A point without finite coordinates (NaN from a caller) spawns nothing.
+    if (x === null || y === null || z === null) return;
     const point = {
-      x: Number(at.x),
-      y: Number(at.y),
-      z: Number(at.z),
-      heading: Number(at.heading ?? at.w ?? 0),
+      x,
+      y,
+      z,
+      heading: readFinite(at.heading ?? at.w) ?? 0,
     };
     void spawnVehicle(id, point, asker, toKeyPurpose(purpose ?? "garage")).then(
       (netId) => {
