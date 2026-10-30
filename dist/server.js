@@ -429,6 +429,52 @@ const vehicleKeys = {
 	has: (source, vehicle) => core$3.HasVehicleKeys(source, vehicle)
 };
 
+// ../../../packages/lib/src/server/vehicle.ts
+/** Every type `CreateVehicleServerSetter` takes; a client answering anything else is ignored. */
+const TYPES = /* @__PURE__ */ new Set([
+	"automobile",
+	"bike",
+	"boat",
+	"heli",
+	"plane",
+	"submarine",
+	"trailer",
+	"train"
+]);
+/** Model -> spawn type, learned from clients once per model (the server cannot read a vehicle class). */
+const types = /* @__PURE__ */ new Map();
+/**
+* The `CreateVehicleServerSetter` type of a model asked from a player's client (ai-core answers); null: no such
+* vehicle. Only a valid type is cached: "no such model" is asked again, so one modified client cannot block a model.
+*/
+async function vehicleType(model, asker) {
+	const known = types.get(model);
+	if (known !== void 0) return known;
+	const answer = await triggerClientCallback(CORE.vehicleTypeCallback, asker, [model]).catch(() => null);
+	if (typeof answer !== "string" || !TYPES.has(answer)) return null;
+	types.set(model, answer);
+	return answer;
+}
+/**
+* Creates a networked vehicle on the server (strict entity lockdown) and sets it up in one step: plate, fuel, state
+* bags, keys for its purpose, a driver. Resolves the entity, or null when the model does not exist or creation failed.
+*/
+async function spawnVehicle$1(options) {
+	const type = options.asker !== void 0 ? await vehicleType(options.model, options.asker) : options.type ?? "automobile";
+	if (!type) return null;
+	const { x, y, z, heading } = options.coords;
+	const vehicle = CreateVehicleServerSetter(GetHashKey(options.model), type, x, y, z, heading);
+	if (!await waitFor(() => DoesEntityExist(vehicle) || void 0, 5e3).catch(() => false)) return null;
+	if (options.persistent !== false) SetEntityOrphanMode(vehicle, 2);
+	if (options.plate) SetVehicleNumberPlateText(vehicle, options.plate.slice(0, 8));
+	const state = Entity(vehicle).state;
+	if (options.fuel !== void 0) state.set(VEHICLE_BAGS.fuel, options.fuel, true);
+	for (const [key, value] of Object.entries(options.bags ?? {})) state.set(key, value, true);
+	if (options.driver !== void 0) SetPedIntoVehicle(GetPlayerPed(String(options.driver)), vehicle, -1);
+	if (options.keysTo !== void 0) vehicleKeys.give(options.keysTo, vehicle, options.purpose ?? "temporary");
+	return vehicle;
+}
+
 // ../../../packages/lib/src/server/proximity.ts
 /**
 * Who is near whom without scanning every player: ai-core keeps which players are in each other's OneSync scope
@@ -25057,9 +25103,6 @@ const ResourceContext = IsDuplicityVersion() ? "server" : "client";
 const log = createLogger(ResourceName);
 
 // resource/common/vehicles.ts
-const EVENTS = { 
-/** Server -> client callback: (model) -> vehicle type for CreateVehicleServerSetter. */
-vehicleType: "ai-vehicles:vehicleType" };
 /** Plates come from the id (base 36, eight characters), so two vehicles never share one. */
 const plateOf = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8);
 
@@ -25217,8 +25260,6 @@ const vehicles = new VehicleStore();
 var World = class {
 	entities = /* @__PURE__ */ new Map();
 	byEntity = /* @__PURE__ */ new Map();
-	/** Model -> CreateVehicleServerSetter type, learned once from a client. */
-	types = /* @__PURE__ */ new Map();
 	entityOf(id) {
 		const entity = this.entities.get(id);
 		return entity && DoesEntityExist(entity) ? entity : void 0;
@@ -25229,41 +25270,38 @@ var World = class {
 	has(id) {
 		return this.entities.has(id);
 	}
-	async typeOf(model, asker) {
-		const known = this.types.get(model);
-		if (known) return known;
-		const answer = await triggerClientCallback(EVENTS.vehicleType, asker, [model]);
-		const type = typeof answer === "string" && /^[a-z]{3,12}$/.test(answer) ? answer : "automobile";
-		this.types.set(model, type);
-		return type;
-	}
-	/** Creates the vehicle on the server (strict lockdown), marks it with its state bags and puts it "out". */
+	/** Creates the vehicle (lib `spawnVehicle`), marks it with its state bags and puts it "out". */
 	async spawn(id, at, asker, purpose) {
 		const vehicle = vehicles.get(id);
 		if (!vehicle || this.entityOf(id)) return null;
-		const type = await this.typeOf(vehicle.model, asker);
-		const entity = CreateVehicleServerSetter(GetHashKey(vehicle.model), type, at.x, at.y, at.z, at.heading);
-		if (!await waitFor(() => DoesEntityExist(entity) || void 0, 5e3).catch(() => false)) {
+		const bags = {
+			[VEHICLE_BAGS.owned]: true,
+			[VEHICLE_BAGS.id]: id
+		};
+		if (vehicle.props) bags[VEHICLE_BAGS.props] = {
+			...vehicle.props,
+			plate: vehicle.plate
+		};
+		const entity = await spawnVehicle$1({
+			model: vehicle.model,
+			coords: at,
+			asker,
+			plate: vehicle.plate,
+			fuel: vehicle.fuel,
+			bags,
+			keysTo: asker,
+			purpose
+		});
+		if (entity === null) {
 			log.error(`vehicle ${id} (${vehicle.model}) could not be created`);
 			return null;
 		}
-		SetEntityOrphanMode(entity, 2);
-		SetVehicleNumberPlateText(entity, vehicle.plate);
-		const state = Entity(entity).state;
-		state.set(VEHICLE_BAGS.owned, true, true);
-		state.set(VEHICLE_BAGS.id, id, true);
-		state.set(VEHICLE_BAGS.fuel, vehicle.fuel, true);
-		if (vehicle.props) state.set(VEHICLE_BAGS.props, {
-			...vehicle.props,
-			plate: vehicle.plate
-		}, true);
 		this.entities.set(id, entity);
 		this.byEntity.set(entity, id);
 		vehicles.update(id, {
 			state: "out",
 			garage: null
 		});
-		vehicleKeys.give(asker, entity, purpose);
 		return NetworkGetNetworkIdFromEntity(entity);
 	}
 	/** Takes the vehicle out of the world (parking); the caller sets the new state. */

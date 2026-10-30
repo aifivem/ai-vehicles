@@ -3,13 +3,6 @@ try{
 (function() {
 
 // ../../../packages/lib/src/fivem/callbackNames.ts
-/**
-	* Callback wire format, the same on both sides:
-	*   request  `aicore:cb:<name>`              (callerResource, id, ...args)
-	*   response `aicore:cbr:<callerResource>`   (id, ok, result)
-	* The response goes only to the resource that asked, so two resources never see each other's replies.
-	*/
-	const requestEvent = (name) => `aicore:cb:${name}`;
 	const responseEvent = (resource) => `aicore:cbr:${resource}`;
 
 // ../../../packages/lib/src/shared/wait.ts
@@ -86,19 +79,7 @@ try{
 	}
 
 // ../../../packages/lib/src/shared/index.ts
-/** GTA vehicle class (`GetVehicleClassFromName`) -> the type `CreateVehicleServerSetter` wants. */
-	function vehicleTypeOfClass(vehicleClass) {
-		switch (vehicleClass) {
-			case 8:
-			case 13: return "bike";
-			case 14: return "boat";
-			case 15: return "heli";
-			case 16: return "plane";
-			case 21: return "train";
-			default: return "automobile";
-		}
-	}
-	/** Console output prefixed with the resource name, so server logs show where a line came from. */
+/** Console output prefixed with the resource name, so server logs show where a line came from. */
 	function createLogger(resource) {
 		const prefix = `[${resource}]`;
 		return {
@@ -129,19 +110,6 @@ try{
 		if (ok === true) entry.resolve(result);
 		else entry.reject(/* @__PURE__ */ new Error("server callback failed"));
 	});
-	/** Answers the server's `triggerClientCallback(name, source, ...)`. Arguments are unknown: parse before use. */
-	function onServerCallback(name, handler) {
-		onNet(requestEvent(name), async (caller, id, ...args) => {
-			if (!fromServer() || typeof caller !== "string" || typeof id !== "number") return;
-			try {
-				const result = await handler(...args);
-				emitNet(responseEvent(caller), id, true, result ?? null);
-			} catch (error) {
-				log$3.error(`callback ${name} failed`, error);
-				emitNet(responseEvent(caller), id, false, null);
-			}
-		});
-	}
 
 // ../../../packages/shared/src/core.ts
 /** Names owned by ai-core that other resources, the bridges and the build step use. */
@@ -562,15 +530,8 @@ try{
 // ../../../packages/lib/src/client/keybind.ts
 	const resource = GetCurrentResourceName();
 
-// resource/common/vehicles.ts
-	const EVENTS = { 
-	/** Server -> client callback: (model) -> vehicle type for CreateVehicleServerSetter. */
-vehicleType: "ai-vehicles:vehicleType" };
-
 // resource/client/index.ts
-/** The server asks a client which spawn type a model is (CreateVehicleServerSetter needs it). */
-	onServerCallback(EVENTS.vehicleType, (model) => typeof model === "string" ? vehicleTypeOfClass(GetVehicleClassFromName(model)) : "automobile");
-	/**
+/**
 	* Owned vehicles carry their look in a state bag; the client that owns the entity applies it (the network copies it
 	* to everyone else). The bag can arrive before the entity streams in, so this waits for it.
 	*/

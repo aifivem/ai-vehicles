@@ -1,7 +1,6 @@
-import { triggerClientCallback, vehicleKeys } from "@aicore-fivem/lib/server";
+import { spawnVehicle } from "@aicore-fivem/lib/server";
 import type { KeyPurpose } from "@aicore-fivem/shared";
-import { waitFor } from "@aicore-fivem/lib/shared";
-import { BAGS, EVENTS } from "common/vehicles";
+import { BAGS } from "common/vehicles";
 import { log } from "./log";
 import { vehicles } from "./store";
 
@@ -16,8 +15,6 @@ export interface SpawnPoint {
 class World {
   private readonly entities = new Map<number, number>();
   private readonly byEntity = new Map<number, number>();
-  /** Model -> CreateVehicleServerSetter type, learned once from a client. */
-  private readonly types = new Map<string, string>();
 
   entityOf(id: number): number | undefined {
     const entity = this.entities.get(id);
@@ -32,38 +29,21 @@ class World {
     return this.entities.has(id);
   }
 
-  private async typeOf(model: string, asker: number): Promise<string> {
-    const known = this.types.get(model);
-    if (known) return known;
-    const answer: unknown = await triggerClientCallback(EVENTS.vehicleType, asker, [model]);
-    const type = typeof answer === "string" && /^[a-z]{3,12}$/.test(answer) ? answer : "automobile";
-    this.types.set(model, type);
-    return type;
-  }
-
-  /** Creates the vehicle on the server (strict lockdown), marks it with its state bags and puts it "out". */
+  /** Creates the vehicle (lib `spawnVehicle`), marks it with its state bags and puts it "out". */
   async spawn(id: number, at: SpawnPoint, asker: number, purpose: KeyPurpose): Promise<number | null> {
     const vehicle = vehicles.get(id);
     if (!vehicle || this.entityOf(id)) return null;
-    const type = await this.typeOf(vehicle.model, asker);
-    const entity = CreateVehicleServerSetter(GetHashKey(vehicle.model), type, at.x, at.y, at.z, at.heading);
-    const exists = await waitFor(() => DoesEntityExist(entity) || undefined, 5000).catch(() => false);
-    if (!exists) {
+    const bags: Record<string, unknown> = { [BAGS.owned]: true, [BAGS.id]: id };
+    if (vehicle.props) bags[BAGS.props] = { ...vehicle.props, plate: vehicle.plate };
+    // Whoever takes it out gets the keys from the active key system (ai-vehiclekeys also knows owners by itself).
+    const entity = await spawnVehicle({ model: vehicle.model, coords: at, asker, plate: vehicle.plate, fuel: vehicle.fuel, bags, keysTo: asker, purpose });
+    if (entity === null) {
       log.error(`vehicle ${id} (${vehicle.model}) could not be created`);
       return null;
     }
-    SetEntityOrphanMode(entity, 2);
-    SetVehicleNumberPlateText(entity, vehicle.plate);
-    const state = Entity(entity).state;
-    state.set(BAGS.owned, true, true);
-    state.set(BAGS.id, id, true);
-    state.set(BAGS.fuel, vehicle.fuel, true);
-    if (vehicle.props) state.set(BAGS.props, { ...vehicle.props, plate: vehicle.plate }, true);
     this.entities.set(id, entity);
     this.byEntity.set(entity, id);
     vehicles.update(id, { state: "out", garage: null });
-    // Whoever takes it out gets the keys from the active key system (ai-vehiclekeys also knows owners by itself).
-    vehicleKeys.give(asker, entity, purpose);
     return NetworkGetNetworkIdFromEntity(entity);
   }
 

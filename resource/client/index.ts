@@ -1,9 +1,6 @@
-import { onServerCallback, setVehicleProps } from "@aicore-fivem/lib/client";
-import { toVehicleProps, vehicleTypeOfClass, waitFor } from "@aicore-fivem/lib/shared";
-import { BAGS, EVENTS } from "common/vehicles";
-
-/** The server asks a client which spawn type a model is (CreateVehicleServerSetter needs it). */
-onServerCallback(EVENTS.vehicleType, (model) => (typeof model === "string" ? vehicleTypeOfClass(GetVehicleClassFromName(model)) : "automobile"));
+import { setVehicleProps } from "@aicore-fivem/lib/client";
+import { toVehicleProps, waitFor } from "@aicore-fivem/lib/shared";
+import { BAGS } from "common/vehicles";
 
 /**
  * Owned vehicles carry their look in a state bag; the client that owns the entity applies it (the network copies it
