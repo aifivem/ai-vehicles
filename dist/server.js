@@ -193,7 +193,7 @@ function triggerClientCallback(name, source, args = [], timeoutMs = 3e4) {
 	});
 }
 // ../../../packages/lib/src/server/admin/validate.ts
-const core$8 = resourceExport(CORE.resource);
+const core$9 = resourceExport(CORE.resource);
 new class {
 	lists = new Map();
 	values(source) {
@@ -201,7 +201,7 @@ new class {
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$8.GetLookupValues(source);
+			list = core$9.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -211,7 +211,7 @@ new class {
 	}
 }(), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/online.ts
-const core$5 = resourceExport(CORE.resource);
+const core$6 = resourceExport(CORE.resource);
 var OnlinePlayers = class {
 	players = new Map();
 	onDuty = new Map();
@@ -220,7 +220,7 @@ var OnlinePlayers = class {
 		if (this.started) return;
 		this.started = !0;
 		let load = (source, character) => {
-			this.put(source, character, (core$5.GetJobs(source) ?? []).map((m) => m.job), (core$5.GetGangs(source) ?? []).map((m) => m.gang)), this.setDuty(source, core$5.GetDutyJob(source));
+			this.put(source, character, (core$6.GetJobs(source) ?? []).map((m) => m.job), (core$6.GetGangs(source) ?? []).map((m) => m.gang)), this.setDuty(source, core$6.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => {
 			let player = this.players.get(source);
@@ -229,8 +229,8 @@ var OnlinePlayers = class {
 			let player = this.players.get(source);
 			player && (player.gangs = gangs.map((m) => m.gang));
 		}), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (let source of core$5.GetLoadedSources()) {
-			let character = core$5.GetCharacter(source);
+		for (let source of core$6.GetLoadedSources()) {
+			let character = core$6.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
@@ -276,10 +276,10 @@ var OnlinePlayers = class {
 const EMPTY = new Set();
 new OnlinePlayers();
 // ../../../packages/lib/src/server/vehicleKeys.ts
-const core$4 = resourceExport(CORE.resource), vehicleKeys = {
-	give: (source, vehicle, purpose = "temporary") => core$4.GiveVehicleKeys(source, vehicle, purpose),
-	remove: (source, vehicle) => core$4.RemoveVehicleKeys(source, vehicle),
-	has: (source, vehicle) => core$4.HasVehicleKeys(source, vehicle)
+const core$5 = resourceExport(CORE.resource), vehicleKeys = {
+	give: (source, vehicle, purpose = "temporary") => core$5.GiveVehicleKeys(source, vehicle, purpose),
+	remove: (source, vehicle) => core$5.RemoveVehicleKeys(source, vehicle),
+	has: (source, vehicle) => core$5.HasVehicleKeys(source, vehicle)
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -14632,7 +14632,7 @@ async function createDatabaseTables(resource, file) {
 		else for (let [name, definition] of statement.columns) columns.has(name) || (await mysql.query(`ALTER TABLE \`${statement.table}\` ADD COLUMN ${definition}`), log$1.info(`^2added column ${statement.table}.${name}^7 (${resource})`));
 	}
 }
-IsDuplicityVersion(), resourceExport(CORE.resource);
+IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/index.ts
 var WriteQueue = class {
 	onError;
