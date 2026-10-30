@@ -1,4 +1,4 @@
-import { triggerClientCallback } from "@aicore-fivem/lib/server";
+import { triggerClientCallback, vehicleKeys } from "@aicore-fivem/lib/server";
 import { waitFor } from "@aicore-fivem/lib/shared";
 import { BAGS, EVENTS } from "common/vehicles";
 import { log } from "./log";
@@ -61,6 +61,8 @@ class World {
     this.entities.set(id, entity);
     this.byEntity.set(entity, id);
     vehicles.update(id, { state: "out", garage: null });
+    // Whoever takes it out gets the keys from the active key system (ai-vehiclekeys also knows owners by itself).
+    vehicleKeys.give(asker, entity);
     return NetworkGetNetworkIdFromEntity(entity);
   }
 
