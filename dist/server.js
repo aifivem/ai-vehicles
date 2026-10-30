@@ -272,6 +272,27 @@ function triggerClientCallback(name, source, args = [], timeoutMs = DEFAULT_CALL
 	});
 }
 
+// ../../../packages/lib/src/server/admin/validate.ts
+/** Values of a lookup list from ai-core (items, jobs, gangs, accounts), cached for 2 s; null = not known (accepted). */
+var LookupCache = class {
+	lists = /* @__PURE__ */ new Map();
+	values(source) {
+		const cached = this.lists.get(source);
+		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
+		let list = [];
+		try {
+			list = resourceExport(CORE.resource).GetLookupValues(source);
+		} catch {}
+		const values = new Set(Array.isArray(list) ? list.filter((v) => typeof v === "string") : []);
+		this.lists.set(source, {
+			at: Date.now(),
+			values
+		});
+		return values.size > 0 ? values : null;
+	}
+};
+const lookups = new LookupCache();
+
 // ../../../packages/lib/src/server/online.ts
 /**
 * This resource's mirror of ai-core's loaded players: characters, job and gang names and duty, read once from ai-core's
