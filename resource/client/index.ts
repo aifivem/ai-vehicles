@@ -1,6 +1,6 @@
-import { setVehicleProps } from "@aicore-fivem/lib/client"
-import { toVehicleProps, waitFor } from "@aicore-fivem/lib/shared"
-import { BAGS } from "common/vehicles"
+import { setVehicleProps } from "@aicore-fivem/lib/client";
+import { toVehicleProps, waitFor } from "@aicore-fivem/lib/shared";
+import { BAGS } from "common/vehicles";
 
 /**
  * Owned vehicles carry their look in a state bag; the client that owns the entity applies it (the network copies it
@@ -10,16 +10,16 @@ AddStateBagChangeHandler(
   BAGS.props,
   "",
   (bagName: string, _key: string, value: unknown) => {
-    const props = toVehicleProps(value)
-    if (!props) return
+    const props = toVehicleProps(value);
+    if (!props) return;
     void waitFor(() => {
-      const entity = GetEntityFromStateBagName(bagName)
-      return entity && DoesEntityExist(entity) ? entity : undefined
+      const entity = GetEntityFromStateBagName(bagName);
+      return entity && DoesEntityExist(entity) ? entity : undefined;
     }, 5000)
       .then((entity) => {
         if (NetworkGetEntityOwner(entity) === PlayerId())
-          setVehicleProps(entity, props)
+          setVehicleProps(entity, props);
       })
-      .catch(() => undefined)
-  }
-)
+      .catch(() => undefined);
+  },
+);
