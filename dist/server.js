@@ -2,53 +2,6 @@ exports = globalThis.exports;
 // \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod, mod.exports), cb = null), mod.exports);
 let node_perf_hooks = require("node:perf_hooks");
-// ../../../packages/shared/src/core.ts
-const CORE = {
-	resource: "ai-core",
-	clientErrorEvent: "ai-core:clientError",
-	playerLoadedEvent: "ai-core:playerLoaded",
-	playerUnloadedEvent: "ai-core:playerUnloaded",
-	moneyChangedEvent: "ai-core:moneyChanged",
-	jobsChangedEvent: "ai-core:jobsChanged",
-	dutyChangedEvent: "ai-core:dutyChanged",
-	gangsChangedEvent: "ai-core:gangsChanged",
-	activeGangChangedEvent: "ai-core:activeGangChanged",
-	characterScreenEvent: "ai-core:characterScreen",
-	inventoryChangedEvent: "ai-core:inventoryChanged",
-	itemUsedEvent: "ai-core:itemUsed",
-	playerDiedEvent: "ai-core:playerDied",
-	clientPlayerLoadedEvent: "ai-core:client:playerLoaded",
-	clientPlayerUnloadedEvent: "ai-core:client:playerUnloaded",
-	clientCharacterPortraitEvent: "ai-core:client:characterPortrait",
-	clientCharacterLookEvent: "ai-core:client:characterLook",
-	clientPromptPressedEvent: "ai-core:client:promptPressed",
-	clientCacheEvent: "ai-core:client:cache",
-	vehicleTypeCallback: "ai-core:vehicleType",
-	interactionStateKey: "ai:interaction",
-	charactersCallback: "ai-core:characters",
-	createCharacterCallback: "ai-core:createCharacter",
-	deleteCharacterCallback: "ai-core:deleteCharacter",
-	selectCharacterCallback: "ai-core:selectCharacter",
-	clientNotifyEvent: "ai-core:client:notify",
-	spawnEvent: "ai-core:client:spawn",
-	openCharactersEvent: "ai-core:client:openCharacters"
-}, KEY_PURPOSES = [
-	"purchase",
-	"garage",
-	"job",
-	"rental",
-	"temporary"
-];
-function toKeyPurpose(value) {
-	return KEY_PURPOSES.find((p) => p === value) ?? "temporary";
-}
-// ../../../packages/shared/src/vehicles.ts
-const VEHICLE_BAGS = {
-	owned: "ai:owned",
-	id: "ai:vid",
-	props: "ai:props",
-	fuel: "fuel"
-};
 // ../../../packages/lib/src/shared/wait.ts
 function waitFor(check, timeoutMs = 1e4) {
 	return new Promise((resolve, reject) => {
@@ -126,6 +79,53 @@ function createLogger(resource) {
 		error: (message, ...details) => console.error(`${prefix} ^1${message}^7`, ...details)
 	};
 }
+// ../../../packages/shared/src/core.ts
+const CORE = {
+	resource: "ai-core",
+	clientErrorEvent: "ai-core:clientError",
+	playerLoadedEvent: "ai-core:playerLoaded",
+	playerUnloadedEvent: "ai-core:playerUnloaded",
+	moneyChangedEvent: "ai-core:moneyChanged",
+	jobsChangedEvent: "ai-core:jobsChanged",
+	dutyChangedEvent: "ai-core:dutyChanged",
+	gangsChangedEvent: "ai-core:gangsChanged",
+	activeGangChangedEvent: "ai-core:activeGangChanged",
+	characterScreenEvent: "ai-core:characterScreen",
+	inventoryChangedEvent: "ai-core:inventoryChanged",
+	itemUsedEvent: "ai-core:itemUsed",
+	playerDiedEvent: "ai-core:playerDied",
+	clientPlayerLoadedEvent: "ai-core:client:playerLoaded",
+	clientPlayerUnloadedEvent: "ai-core:client:playerUnloaded",
+	clientCharacterPortraitEvent: "ai-core:client:characterPortrait",
+	clientCharacterLookEvent: "ai-core:client:characterLook",
+	clientPromptPressedEvent: "ai-core:client:promptPressed",
+	clientCacheEvent: "ai-core:client:cache",
+	vehicleTypeCallback: "ai-core:vehicleType",
+	interactionStateKey: "ai:interaction",
+	charactersCallback: "ai-core:characters",
+	createCharacterCallback: "ai-core:createCharacter",
+	deleteCharacterCallback: "ai-core:deleteCharacter",
+	selectCharacterCallback: "ai-core:selectCharacter",
+	clientNotifyEvent: "ai-core:client:notify",
+	spawnEvent: "ai-core:client:spawn",
+	openCharactersEvent: "ai-core:client:openCharacters"
+}, KEY_PURPOSES = [
+	"purchase",
+	"garage",
+	"job",
+	"rental",
+	"temporary"
+];
+function toKeyPurpose(value) {
+	return KEY_PURPOSES.find((p) => p === value) ?? "temporary";
+}
+// ../../../packages/shared/src/vehicles.ts
+const VEHICLE_BAGS = {
+	owned: "ai:owned",
+	id: "ai:vid",
+	props: "ai:props",
+	fuel: "fuel"
+};
 // ../../../packages/lib/src/fivem/exports.ts
 function registerExport(name, handler) {
 	globalThis.exports(name, handler);
