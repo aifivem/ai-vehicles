@@ -116,6 +116,8 @@ const CORE = {
 	dutyChangedEvent: "ai-core:dutyChanged",
 	gangsChangedEvent: "ai-core:gangsChanged",
 	activeGangChangedEvent: "ai-core:activeGangChanged",
+	metaChangedEvent: "ai-core:metaChanged",
+	definitionsChangedEvent: "ai-core:definitionsChanged",
 	characterScreenEvent: "ai-core:characterScreen",
 	inventoryChangedEvent: "ai-core:inventoryChanged",
 	itemUsedEvent: "ai-core:itemUsed",
@@ -127,6 +129,9 @@ const CORE = {
 	clientPromptPressedEvent: "ai-core:client:promptPressed",
 	clientCacheEvent: "ai-core:client:cache",
 	clientHudVisibleEvent: "ai-core:client:hudVisible",
+	clientWorldSyncEvent: "ai-core:client:worldSync",
+	clientCancelProgressEvent: "ai-core:client:cancelProgress",
+	clientDefinitionsEvent: "ai-core:client:definitions",
 	vehicleTypeCallback: "ai-core:vehicleType",
 	interactionStateKey: "ai:interaction",
 	charactersCallback: "ai-core:characters",
@@ -359,12 +364,14 @@ const EMPTY = new Set(), online = new OnlinePlayers(), core$11 = resourceExport(
 	"submarine",
 	"trailer",
 	"train"
-]), types = new Map();
+]), types = new Map(), votes = new Map();
 async function vehicleType(model, asker) {
 	let known = types.get(model);
 	if (known !== void 0) return known;
 	let answer = await triggerClientCallback(CORE.vehicleTypeCallback, asker, [model]).catch(() => null);
-	return typeof answer != "string" || !TYPES.has(answer) ? null : (types.set(model, answer), answer);
+	if (typeof answer != "string" || !TYPES.has(answer)) return null;
+	let seen = votes.get(model) ?? new Map(), first = seen.get(answer);
+	return first !== void 0 && first !== asker ? (types.set(model, answer), votes.delete(model)) : (seen.set(answer, asker), votes.set(model, seen)), answer;
 }
 async function seatPlayer(vehicle, source, seat) {
 	let ped = GetPlayerPed(String(source));
@@ -14992,6 +14999,7 @@ const vehicles = new class {
 }(), world = new class {
 	entities = new Map();
 	byEntity = new Map();
+	spawning = new Set();
 	entityOf(id) {
 		let entity = this.entities.get(id);
 		return entity && DoesEntityExist(entity) ? entity : void 0;
@@ -15004,7 +15012,15 @@ const vehicles = new class {
 	}
 	async spawn(id, at, asker, purpose) {
 		let vehicle = vehicles.get(id);
-		if (!vehicle || this.entityOf(id)) return null;
+		if (!vehicle || this.entityOf(id) || this.spawning.has(id)) return null;
+		this.spawning.add(id);
+		try {
+			return await this.create(id, vehicle, at, asker, purpose);
+		} finally {
+			this.spawning.delete(id);
+		}
+	}
+	async create(id, vehicle, at, asker, purpose) {
 		let bags = {
 			[VEHICLE_BAGS.owned]: !0,
 			[VEHICLE_BAGS.id]: id

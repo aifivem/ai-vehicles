@@ -16,6 +16,8 @@ export interface SpawnPoint {
 class World {
   private readonly entities = new Map<number, number>();
   private readonly byEntity = new Map<number, number>();
+  /** Vehicle ids whose entity is being created. */
+  private readonly spawning = new Set<number>();
 
   entityOf(id: number): number | undefined {
     const entity = this.entities.get(id);
@@ -38,7 +40,23 @@ class World {
     purpose: KeyPurpose,
   ): Promise<number | null> {
     const vehicle = vehicles.get(id);
-    if (!vehicle || this.entityOf(id)) return null;
+    if (!vehicle || this.entityOf(id) || this.spawning.has(id)) return null;
+    // Held from here to the end of the await: a second take-out of the same car (another job member) is refused.
+    this.spawning.add(id);
+    try {
+      return await this.create(id, vehicle, at, asker, purpose);
+    } finally {
+      this.spawning.delete(id);
+    }
+  }
+
+  private async create(
+    id: number,
+    vehicle: NonNullable<ReturnType<typeof vehicles.get>>,
+    at: SpawnPoint,
+    asker: number,
+    purpose: KeyPurpose,
+  ): Promise<number | null> {
     const bags: Record<string, unknown> = { [BAGS.owned]: true, [BAGS.id]: id };
     if (vehicle.props)
       bags[BAGS.props] = { ...vehicle.props, plate: vehicle.plate };
