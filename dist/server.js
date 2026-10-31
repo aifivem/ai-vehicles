@@ -134,6 +134,7 @@ const CORE = {
 	clientDefinitionsEvent: "ai-core:client:definitions",
 	vehicleTypeCallback: "ai-core:vehicleType",
 	interactionStateKey: "ai:interaction",
+	pvpStateKey: "ai:pvp",
 	charactersCallback: "ai-core:characters",
 	createCharacterCallback: "ai-core:createCharacter",
 	deleteCharacterCallback: "ai-core:deleteCharacter",
@@ -14935,7 +14936,7 @@ createLocale();
 const ResourceName = GetCurrentResourceName();
 IsDuplicityVersion();
 // resource/server/log.ts
-const log = createLogger(ResourceName), plateOf = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8), ownerFeed = new class {
+const log = createLogger(ResourceName), plateFromId = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8), ownerFeed = new class {
 	puts = new Map();
 	removes = new Set();
 	queued = !1;
@@ -15040,7 +15041,7 @@ const vehicles = new class {
 	create(owner, model, garage, state = "garage") {
 		let id = this.nextId++, vehicle = {
 			id,
-			plate: plateOf(id),
+			plate: plateFromId(id),
 			owner,
 			model,
 			props: null,

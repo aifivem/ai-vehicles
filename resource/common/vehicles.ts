@@ -9,7 +9,7 @@ export type {
 export { VEHICLE_BAGS as BAGS } from "@aicore-fivem/shared";
 
 /** Plates come from the id (base 36, eight characters), so two vehicles never share one. */
-export const plateOf = (id: number): string =>
+export const plateFromId = (id: number): string =>
   `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8);
 
 /**

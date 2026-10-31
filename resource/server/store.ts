@@ -6,7 +6,7 @@ import {
   toVehicleSetup,
 } from "@aicore-fivem/lib/shared";
 import {
-  plateOf,
+  plateFromId,
   type OwnedVehicle,
   type Owner,
   type OwnerType,
@@ -162,7 +162,7 @@ class VehicleStore {
     const id = this.nextId++;
     const vehicle: OwnedVehicle = {
       id,
-      plate: plateOf(id),
+      plate: plateFromId(id),
       owner,
       model,
       props: null,
