@@ -140,6 +140,8 @@ const CORE = {
 	selectCharacterCallback: "ai-core:selectCharacter",
 	clientNotifyEvent: "ai-core:client:notify",
 	spawnEvent: "ai-core:client:spawn",
+	chooseSpawnEvent: "ai-core:client:chooseSpawn",
+	spawnChoiceCallback: "ai-core:spawnChoice",
 	openCharactersEvent: "ai-core:client:openCharacters"
 }, KEY_PURPOSES = [
 	"purchase",
@@ -226,7 +228,7 @@ function triggerClientCallback(name, source, args = [], timeoutMs = 3e4) {
 	});
 }
 // ../../../packages/lib/src/server/admin/validate.ts
-const core$15 = resourceExport(CORE.resource);
+const core$16 = resourceExport(CORE.resource);
 new class {
 	lists = new Map();
 	values(source) {
@@ -234,7 +236,7 @@ new class {
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$15.GetLookupValues(source);
+			list = core$16.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -244,7 +246,7 @@ new class {
 	}
 }(), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/online.ts
-const core$12 = resourceExport(CORE.resource);
+const core$13 = resourceExport(CORE.resource);
 function reindex(index, source, before, after) {
 	for (let name of before) {
 		let set = index.get(name);
@@ -272,11 +274,11 @@ var OnlinePlayers = class {
 				gangs: [],
 				gangNames: [],
 				duty: null
-			}), this.setJobs(source, core$12.GetJobs(source) ?? []), this.setGangs(source, core$12.GetGangs(source) ?? []), this.setDuty(source, core$12.GetDutyJob(source));
+			}), this.setJobs(source, core$13.GetJobs(source) ?? []), this.setGangs(source, core$13.GetGangs(source) ?? []), this.setDuty(source, core$13.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (let source of core$12.GetLoadedSources()) {
-			let character = core$12.GetCharacter(source);
+		for (let source of core$13.GetLoadedSources()) {
+			let character = core$13.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
@@ -316,6 +318,10 @@ var OnlinePlayers = class {
 	character(source) {
 		return this.start(), this.players.get(source)?.character ?? null;
 	}
+	name(source, options = {}) {
+		let c = this.character(source);
+		return c ? `${c.firstname} ${c.lastname}` : options.fallback === !1 ? "" : GetPlayerName(String(source));
+	}
 	jobs(source) {
 		return this.start(), this.players.get(source)?.jobNames ?? [];
 	}
@@ -351,10 +357,10 @@ var OnlinePlayers = class {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY = new Set(), online = new OnlinePlayers(), core$11 = resourceExport(CORE.resource), vehicleKeys = {
-	give: (source, vehicle, purpose = "temporary") => core$11.GiveVehicleKeys(source, vehicle, purpose),
-	remove: (source, vehicle) => core$11.RemoveVehicleKeys(source, vehicle),
-	has: (source, vehicle) => core$11.HasVehicleKeys(source, vehicle)
+const EMPTY = new Set(), online = new OnlinePlayers(), core$12 = resourceExport(CORE.resource), vehicleKeys = {
+	give: (source, vehicle, purpose = "temporary") => core$12.GiveVehicleKeys(source, vehicle, purpose),
+	remove: (source, vehicle) => core$12.RemoveVehicleKeys(source, vehicle),
+	has: (source, vehicle) => core$12.HasVehicleKeys(source, vehicle)
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -14791,8 +14797,9 @@ var Group = class {
 	get front() {
 		return this.dues[this.head] ?? 0;
 	}
+	compactAt = 64;
 	push(job, due) {
-		this.count > this.mask && this.grow();
+		this.count >= this.compactAt && this.compact(), this.count > this.mask && this.grow();
 		let i = this.head + this.count & this.mask;
 		this.jobs[i] = job, this.gens[i] = job.gen, this.dues[i] = due, this.count++;
 	}
@@ -14805,6 +14812,17 @@ var Group = class {
 			let next = due + this.interval;
 			next <= now && (next = now + this.interval), this.push(job, next), job.call();
 		}
+	}
+	compact() {
+		let kept = 0;
+		for (let n = 0; n < this.count; n++) {
+			let i = this.head + n & this.mask, job = this.jobs[i];
+			if (!job || job.gen !== this.gens[i]) continue;
+			let k = this.head + kept & this.mask;
+			this.jobs[k] = job, this.gens[k] = this.gens[i] ?? 0, this.dues[k] = this.dues[i] ?? 0, kept++;
+		}
+		for (let n = kept; n < this.count; n++) this.jobs[this.head + n & this.mask] = void 0;
+		this.count = kept, this.compactAt = Math.max(64, kept * 2);
 	}
 	grow() {
 		let size = (this.mask + 1) * 2, jobs = Array(size), gens = Array(size).fill(0), dues = Array(size).fill(0);
@@ -14850,7 +14868,7 @@ new class {
 		}
 		groups.length = kept, this.nextDue = soonest;
 	};
-}(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
+}(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/index.ts
 var WriteQueue = class {
 	onError;
