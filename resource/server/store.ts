@@ -1,6 +1,10 @@
 import { mysql } from "@aicore-fivem/mysql";
 import { WriteQueue } from "@aicore-fivem/lib/server";
-import { toVehicleProps, toVehicleSetup } from "@aicore-fivem/lib/shared";
+import {
+  normalizePlate,
+  toVehicleProps,
+  toVehicleSetup,
+} from "@aicore-fivem/lib/shared";
 import {
   plateOf,
   type OwnedVehicle,
@@ -131,7 +135,7 @@ class VehicleStore {
   }
 
   byPlateText(plate: string): OwnedVehicle | undefined {
-    const id = this.byPlate.get(plate.trim().toUpperCase());
+    const id = this.byPlate.get(normalizePlate(plate));
     return id === undefined ? undefined : this.byId.get(id);
   }
 

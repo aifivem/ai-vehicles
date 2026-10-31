@@ -18,8 +18,8 @@ function waitFor(check, timeoutMs = 1e4, intervalMs = 0) {
 function readFinite(value) {
 	return typeof value == "number" && Number.isFinite(value) ? value : null;
 }
-// ../../../packages/lib/src/shared/access.ts
-const isPublic = (rule) => rule.jobs.length === 0 && rule.gangs.length === 0;
+// ../../../packages/lib/src/shared/format.ts
+const normalizePlate = (plate) => plate.trim().toUpperCase(), isPublic = (rule) => rule.jobs.length === 0 && rule.gangs.length === 0;
 // ../../../packages/lib/src/shared/lang.ts
 function formatText(template, args) {
 	return template.replace(/\{(\d+)\}/g, (match, index) => {
@@ -15022,7 +15022,7 @@ const vehicles = new class {
 		return this.byId.get(id);
 	}
 	byPlateText(plate) {
-		let id = this.byPlate.get(plate.trim().toUpperCase());
+		let id = this.byPlate.get(normalizePlate(plate));
 		return id === void 0 ? void 0 : this.byId.get(id);
 	}
 	plateOwners() {
