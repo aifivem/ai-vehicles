@@ -6,9 +6,11 @@ import {
   type OwnedVehicle,
   type Owner,
   type OwnerType,
+  type PlateOwner,
   type VehicleState,
 } from "common/vehicles";
 import { log } from "./log";
+import { ownerFeed } from "./ownerFeed";
 
 interface Row {
   id: number | string;
@@ -92,6 +94,7 @@ class VehicleStore {
     let set = this.byOwner.get(key);
     if (!set) this.byOwner.set(key, (set = new Set()));
     set.add(vehicle.id);
+    ownerFeed.put(vehicle);
   }
 
   private forget(id: number): void {
@@ -100,6 +103,7 @@ class VehicleStore {
     this.byId.delete(id);
     this.byPlate.delete(vehicle.plate);
     this.byOwner.get(ownerKey(vehicle.owner))?.delete(id);
+    ownerFeed.remove(vehicle.plate);
   }
 
   async loadOwner(owner: Owner): Promise<void> {
@@ -129,6 +133,14 @@ class VehicleStore {
   byPlateText(plate: string): OwnedVehicle | undefined {
     const id = this.byPlate.get(plate.trim().toUpperCase());
     return id === undefined ? undefined : this.byId.get(id);
+  }
+
+  /** Every vehicle in memory as `[plate, ownerType, ownerId]` (the `OWNERS_EVENT` mirror's snapshot). */
+  plateOwners(): PlateOwner[] {
+    const list: PlateOwner[] = [];
+    for (const v of this.byId.values())
+      list.push([v.plate, v.owner.type, v.owner.id]);
+    return list;
   }
 
   ofOwner(owner: Owner): OwnedVehicle[] {

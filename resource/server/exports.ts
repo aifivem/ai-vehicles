@@ -14,6 +14,7 @@ import {
   storeVehicle,
   toOwner,
 } from "./api";
+import { readQbxProps } from "./qbxProps";
 import { vehicles } from "./store";
 import { world } from "./world";
 
@@ -41,6 +42,7 @@ registerExport("GetVehicles", (owner: unknown) => {
   const o = toOwner(owner);
   return o ? vehicles.ofOwner(o) : [];
 });
+registerExport("GetPlateOwners", () => vehicles.plateOwners());
 registerExport(
   "IsOwnedPlate",
   (plate: unknown) =>
@@ -193,7 +195,8 @@ const qbx: Record<string, (...args: unknown[]) => unknown> = {
   DoesPlayerVehiclePlateExist: (plate) =>
     typeof plate === "string" && vehicles.byPlateText(plate) !== undefined,
   SaveVehicle: (entity, options) => {
-    const id = typeof entity === "number" ? world.idOf(entity) : undefined;
+    const handle = typeof entity === "number" ? entity : 0;
+    const id = world.idOf(handle);
     if (id === undefined || !isRecord(options)) return false;
     const state =
       options.state === 1
@@ -203,11 +206,16 @@ const qbx: Record<string, (...args: unknown[]) => unknown> = {
           : options.state === 2
             ? "impound"
             : undefined;
-    // Qbox scripts save the full client props on park (tuning scripts rely on it): the stand-in keeps them whole.
+    // Qbox scripts save the full client props on park, mods included (owner decision: kept, tuning scripts rely on
+    // it). Ours or ox_lib / qb-core's shape, refused when they belong to another model than the entity.
+    const props =
+      options.props == null
+        ? undefined
+        : (readQbxProps(options.props, GetEntityModel(handle)) ?? undefined);
     saveVehicle(
       id,
       {
-        props: options.props,
+        props,
         state,
         garage: typeof options.garage === "string" ? options.garage : undefined,
       },

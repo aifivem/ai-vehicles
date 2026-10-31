@@ -18,6 +18,8 @@ function waitFor(check, timeoutMs = 1e4, intervalMs = 0) {
 function readFinite(value) {
 	return typeof value == "number" && Number.isFinite(value) ? value : null;
 }
+// ../../../packages/lib/src/shared/access.ts
+const isPublic = (rule) => rule.jobs.length === 0 && rule.gangs.length === 0;
 // ../../../packages/lib/src/shared/lang.ts
 function formatText(template, args) {
 	return template.replace(/\{(\d+)\}/g, (match, index) => {
@@ -157,7 +159,7 @@ const VEHICLE_BAGS = {
 	props: "ai:props",
 	setup: "ai:setup",
 	fuel: "fuel"
-}, named = new Set();
+}, VEHICLES_EVENTS = { owners: "ai-vehicles:owners" }, named = new Set();
 function registerExport(name, handler) {
 	named.add(name), globalThis.exports(name, handler);
 	let first = name.charAt(0), twin = (first === first.toUpperCase() ? first.toLowerCase() : first.toUpperCase()) + name.slice(1);
@@ -225,7 +227,7 @@ function triggerClientCallback(name, source, args = [], timeoutMs = 3e4) {
 	});
 }
 // ../../../packages/lib/src/server/admin/validate.ts
-const core$16 = resourceExport(CORE.resource);
+const core$17 = resourceExport(CORE.resource);
 new class {
 	lists = new Map();
 	values(source) {
@@ -233,7 +235,7 @@ new class {
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$16.GetLookupValues(source);
+			list = core$17.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -243,7 +245,7 @@ new class {
 	}
 }(), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/online.ts
-const core$13 = resourceExport(CORE.resource);
+const core$14 = resourceExport(CORE.resource);
 function reindex(index, source, before, after) {
 	for (let name of before) {
 		let set = index.get(name);
@@ -271,11 +273,11 @@ var OnlinePlayers = class {
 				gangs: [],
 				gangNames: [],
 				duty: null
-			}), this.setJobs(source, core$13.GetJobs(source) ?? []), this.setGangs(source, core$13.GetGangs(source) ?? []), this.setDuty(source, core$13.GetDutyJob(source));
+			}), this.setJobs(source, core$14.GetJobs(source) ?? []), this.setGangs(source, core$14.GetGangs(source) ?? []), this.setDuty(source, core$14.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (let source of core$13.GetLoadedSources()) {
-			let character = core$13.GetCharacter(source);
+		for (let source of core$14.GetLoadedSources()) {
+			let character = core$14.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
@@ -344,6 +346,20 @@ var OnlinePlayers = class {
 		let duty = this.dutyJob(source);
 		return duty !== null && jobs.includes(duty);
 	}
+	allows(source, rule) {
+		if (isPublic(rule)) return !0;
+		let min = (name) => rule.grades[name] ?? 0;
+		for (let gang of rule.gangs) {
+			let grade = this.gangGrade(source, gang);
+			if (grade !== null && grade >= min(gang)) return !0;
+		}
+		let duty = rule.onDuty ? this.dutyJob(source) : null;
+		for (let job of rule.jobs) {
+			let grade = this.jobGrade(source, job);
+			if (grade !== null && grade >= min(job) && (!rule.onDuty || duty === job)) return !0;
+		}
+		return !1;
+	}
 	countOnDuty(jobs) {
 		this.start();
 		let count = 0;
@@ -354,10 +370,10 @@ var OnlinePlayers = class {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY = new Set(), online = new OnlinePlayers(), core$12 = resourceExport(CORE.resource), vehicleKeys = {
-	give: (source, vehicle, purpose = "temporary") => core$12.GiveVehicleKeys(source, vehicle, purpose),
-	remove: (source, vehicle) => core$12.RemoveVehicleKeys(source, vehicle),
-	has: (source, vehicle) => core$12.HasVehicleKeys(source, vehicle)
+const EMPTY = new Set(), online = new OnlinePlayers(), core$13 = resourceExport(CORE.resource), vehicleKeys = {
+	give: (source, vehicle, purpose = "temporary") => core$13.GiveVehicleKeys(source, vehicle, purpose),
+	remove: (source, vehicle) => core$13.RemoveVehicleKeys(source, vehicle),
+	has: (source, vehicle) => core$13.HasVehicleKeys(source, vehicle)
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -469,6 +485,25 @@ on(CORE.playerUnloadedEvent, (source) => {
 	let settle = running.get(source);
 	settle && settle(!1);
 });
+// ../../../packages/lib/src/server/definitions.ts
+const core$11 = resourceExport("ai-core");
+new class {
+	jobs = new Map();
+	gangs = new Map();
+	constructor() {
+		on(CORE.definitionsChangedEvent, (file, name) => {
+			typeof name == "string" && (file === "jobs" ? this.jobs.delete(name) : file === "gangs" && this.gangs.delete(name));
+		});
+	}
+	job(name) {
+		let def = this.jobs.get(name);
+		return def === void 0 && this.jobs.set(name, def = core$11.GetJobDefinition(name) ?? null), def;
+	}
+	gang(name) {
+		let def = this.gangs.get(name);
+		return def === void 0 && this.gangs.set(name, def = core$11.GetGangDefinition(name) ?? null), def;
+	}
+}();
 // ../../../packages/lib/src/server/command.ts
 const resource$3 = GetCurrentResourceName();
 createLogger(resource$3), new class {
@@ -14900,7 +14935,28 @@ createLocale();
 const ResourceName = GetCurrentResourceName();
 IsDuplicityVersion();
 // resource/server/log.ts
-const log = createLogger(ResourceName), plateOf = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8), ownerKey = (owner) => `${owner.type}:${owner.id}`, isOwnerType = (v) => v === "character" || v === "job" || v === "gang" || v === "resource", isState$1 = (v) => v === "garage" || v === "out" || v === "impound";
+const log = createLogger(ResourceName), plateOf = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8), ownerFeed = new class {
+	puts = new Map();
+	removes = new Set();
+	queued = !1;
+	put(vehicle) {
+		this.removes.delete(vehicle.plate), this.puts.set(vehicle.plate, [
+			vehicle.plate,
+			vehicle.owner.type,
+			vehicle.owner.id
+		]), this.queue();
+	}
+	remove(plate) {
+		this.puts.delete(plate), this.removes.add(plate), this.queue();
+	}
+	queue() {
+		this.queued || (this.queued = !0, setImmediate(() => {
+			this.queued = !1;
+			let puts = [...this.puts.values()], removes = [...this.removes];
+			this.puts.clear(), this.removes.clear(), emit(VEHICLES_EVENTS.owners, puts, removes);
+		}));
+	}
+}(), ownerKey = (owner) => `${owner.type}:${owner.id}`, isOwnerType = (v) => v === "character" || v === "job" || v === "gang" || v === "resource", isState$1 = (v) => v === "garage" || v === "out" || v === "impound";
 function fromRow(row) {
 	if (!isOwnerType(row.owner_type)) return null;
 	let props = null, setup = null;
@@ -14944,11 +15000,11 @@ const vehicles = new class {
 		if (!vehicle) return;
 		this.byId.set(vehicle.id, vehicle), this.byPlate.set(vehicle.plate, vehicle.id);
 		let key = ownerKey(vehicle.owner), set = this.byOwner.get(key);
-		set || this.byOwner.set(key, set = new Set()), set.add(vehicle.id);
+		set || this.byOwner.set(key, set = new Set()), set.add(vehicle.id), ownerFeed.put(vehicle);
 	}
 	forget(id) {
 		let vehicle = this.byId.get(id);
-		vehicle && (this.byId.delete(id), this.byPlate.delete(vehicle.plate), this.byOwner.get(ownerKey(vehicle.owner))?.delete(id));
+		vehicle && (this.byId.delete(id), this.byPlate.delete(vehicle.plate), this.byOwner.get(ownerKey(vehicle.owner))?.delete(id), ownerFeed.remove(vehicle.plate));
 	}
 	async loadOwner(owner) {
 		let key = ownerKey(owner);
@@ -14968,6 +15024,15 @@ const vehicles = new class {
 	byPlateText(plate) {
 		let id = this.byPlate.get(plate.trim().toUpperCase());
 		return id === void 0 ? void 0 : this.byId.get(id);
+	}
+	plateOwners() {
+		let list = [];
+		for (let v of this.byId.values()) list.push([
+			v.plate,
+			v.owner.type,
+			v.owner.id
+		]);
+		return list;
 	}
 	ofOwner(owner) {
 		return [...this.byOwner.get(ownerKey(owner)) ?? []].flatMap((id) => this.byId.get(id) ?? []);
@@ -15148,6 +15213,83 @@ function storeVehicle(id, garage, state = "garage") {
 		garage
 	});
 }
+// resource/server/qbxProps.ts
+const MOD_NAMES = "modSpoilers.modFrontBumper.modRearBumper.modSideSkirt.modExhaust.modFrame.modGrille.modHood.modFender.modRightFender.modRoof.modEngine.modBrakes.modTransmission.modHorns.modSuspension.modArmor.modNitrous.modTurbo.modSubwoofer.modSmokeEnabled.modHydraulics.modXenon.modFrontWheels.modBackWheels.modPlateHolder.modVanityPlate.modTrimA.modOrnaments.modDashboard.modDial.modDoorSpeaker.modSeats.modSteeringWheel.modShifterLeavers.modAPlate.modSpeakers.modTrunk.modHydrolic.modEngineBlock.modAirFilter.modStruts.modArchCover.modAerials.modTrimB.modTank.modWindows.modDoorR.modLivery.modLightbar".split("."), TOGGLE_MODS = new Set([
+	17,
+	18,
+	19,
+	20,
+	21,
+	22
+]), int = (v, min, max) => typeof v == "number" && Number.isInteger(v) && v >= min && v <= max ? v : null, finite = (v, fallback) => typeof v == "number" && Number.isFinite(v) ? v : fallback, rgb = (v) => {
+	if (!Array.isArray(v) || v.length !== 3) return null;
+	let [r, g, b] = v.map((x) => int(x, 0, 255));
+	return r != null && g != null && b != null ? [
+		r,
+		g,
+		b
+	] : null;
+};
+function readExtras(v) {
+	let extras = {}, entries = Array.isArray(v) ? v.map((x, i) => [i + 1, x]) : isRecord(v) ? Object.entries(v).map(([k, x]) => [Number(k), x]) : [];
+	for (let [id, x] of entries) int(id, 0, 20) !== null && (typeof x == "boolean" ? extras[id] = x : (x === 0 || x === 1) && (extras[id] = x === 0));
+	return extras;
+}
+function fromFrameworkProps(v) {
+	let model = int(v.model, -2147483648, 4294967295);
+	if (model === null) return null;
+	let mods = {};
+	MOD_NAMES.forEach((name, type) => {
+		let x = v[name];
+		if (TOGGLE_MODS.has(type)) {
+			typeof x == "boolean" ? mods[type] = +!!x : (x === 0 || x === 1) && (mods[type] = x);
+			return;
+		}
+		let index = int(x, -1, 255);
+		index !== null && (mods[type] = index);
+	});
+	let color = (x) => int(x, 0, 255), neon = Array.isArray(v.neonEnabled) ? v.neonEnabled : [];
+	return {
+		v: 1,
+		model: model > 2147483647 ? model - 4294967296 : model,
+		plate: typeof v.plate == "string" ? v.plate.trim().slice(0, 8) : "",
+		plateIndex: int(v.plateIndex, 0, 12) ?? 0,
+		colors: [color(v.color1) ?? 0, color(v.color2) ?? 0],
+		extraColors: [color(v.pearlescentColor) ?? 0, color(v.wheelColor) ?? 0],
+		customPrimary: rgb(v.color1),
+		customSecondary: rgb(v.color2),
+		wheelType: int(v.wheels, -1, 12) ?? 0,
+		windowTint: int(v.windowTint, -1, 6) ?? -1,
+		livery: int(v.livery, -1, 255) ?? -1,
+		mods,
+		xenonColor: int(v.xenonColor, -1, 255) ?? 255,
+		neon: [
+			0,
+			1,
+			2,
+			3
+		].map((i) => neon[i] === !0),
+		neonColor: rgb(v.neonColor) ?? [
+			255,
+			0,
+			255
+		],
+		tyreSmoke: rgb(v.tyreSmokeColor) ?? [
+			255,
+			255,
+			255
+		],
+		extras: readExtras(v.extras),
+		dirt: Math.min(15, Math.max(0, finite(v.dirtLevel, 0))),
+		engineHealth: Math.min(1e3, Math.max(-4e3, finite(v.engineHealth, 1e3))),
+		bodyHealth: Math.min(1e3, Math.max(0, finite(v.bodyHealth, 1e3)))
+	};
+}
+function readQbxProps(value, entityModel) {
+	if (!isRecord(value)) return null;
+	let props = toVehicleProps(value) ?? fromFrameworkProps(value);
+	return props && props.model === entityModel ? props : null;
+}
 // resource/server/exports.ts
 const core = resourceExport("ai-core"), isState = (v) => v === "garage" || v === "out" || v === "impound";
 registerExport("CreateVehicle", (owner, model, garage, props) => {
@@ -15161,7 +15303,7 @@ registerExport("CreateVehicle", (owner, model, garage, props) => {
 }), registerExport("GetVehicle", (ref) => find(ref) ?? null), registerExport("GetVehicles", (owner) => {
 	let o = toOwner(owner);
 	return o ? vehicles.ofOwner(o) : [];
-}), registerExport("IsOwnedPlate", (plate) => typeof plate == "string" && vehicles.byPlateText(plate) !== void 0), registerExport("GetVehicleIdByEntity", (entity) => typeof entity == "number" ? world.idOf(entity) ?? null : null), registerExport("GetEntity", (id) => typeof id == "number" ? world.entityOf(id) ?? null : null), registerExport("SaveVehicle", (id, change) => {
+}), registerExport("GetPlateOwners", () => vehicles.plateOwners()), registerExport("IsOwnedPlate", (plate) => typeof plate == "string" && vehicles.byPlateText(plate) !== void 0), registerExport("GetVehicleIdByEntity", (entity) => typeof entity == "number" ? world.idOf(entity) ?? null : null), registerExport("GetEntity", (id) => typeof id == "number" ? world.entityOf(id) ?? null : null), registerExport("SaveVehicle", (id, change) => {
 	typeof id == "number" && isRecord(change) && saveVehicle(id, {
 		...change,
 		state: isState(change.state) ? change.state : void 0,
@@ -15249,11 +15391,11 @@ const qbx = {
 	GetVehicleIdByPlate: (plate) => find(plate)?.id ?? null,
 	DoesPlayerVehiclePlateExist: (plate) => typeof plate == "string" && vehicles.byPlateText(plate) !== void 0,
 	SaveVehicle: (entity, options) => {
-		let id = typeof entity == "number" ? world.idOf(entity) : void 0;
+		let handle = typeof entity == "number" ? entity : 0, id = world.idOf(handle);
 		if (id === void 0 || !isRecord(options)) return !1;
 		let state = options.state === 1 ? "garage" : options.state === 0 ? "out" : options.state === 2 ? "impound" : void 0;
 		return saveVehicle(id, {
-			props: options.props,
+			props: options.props == null ? void 0 : readQbxProps(options.props, GetEntityModel(handle)) ?? void 0,
 			state,
 			garage: typeof options.garage == "string" ? options.garage : void 0
 		}, !0), !0;
