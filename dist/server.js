@@ -14900,7 +14900,7 @@ createLocale();
 const ResourceName = GetCurrentResourceName();
 IsDuplicityVersion();
 // resource/server/log.ts
-const log = createLogger(ResourceName), plateOf = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8), ownerKey = (owner) => `${owner.type}:${owner.id}`, isOwnerType = (v) => v === "character" || v === "job" || v === "gang", isState$1 = (v) => v === "garage" || v === "out" || v === "impound";
+const log = createLogger(ResourceName), plateOf = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8), ownerKey = (owner) => `${owner.type}:${owner.id}`, isOwnerType = (v) => v === "character" || v === "job" || v === "gang" || v === "resource", isState$1 = (v) => v === "garage" || v === "out" || v === "impound";
 function fromRow(row) {
 	if (!isOwnerType(row.owner_type)) return null;
 	let props = null, setup = null;
@@ -15091,7 +15091,7 @@ const vehicles = new class {
 on("entityRemoved", (entity) => world.removed(entity));
 // resource/server/api.ts
 function toOwner(v) {
-	if (!isRecord(v) || v.type !== "character" && v.type !== "job" && v.type !== "gang") return null;
+	if (!isRecord(v) || v.type !== "character" && v.type !== "job" && v.type !== "gang" && v.type !== "resource") return null;
 	let id = typeof v.id == "number" ? String(v.id) : typeof v.id == "string" && v.id.length <= 64 ? v.id : null;
 	return id ? {
 		type: v.type,

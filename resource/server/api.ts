@@ -13,7 +13,10 @@ import { world, type SpawnPoint } from "./world";
 export function toOwner(v: unknown): Owner | null {
   if (
     !isRecord(v) ||
-    (v.type !== "character" && v.type !== "job" && v.type !== "gang")
+    (v.type !== "character" &&
+      v.type !== "job" &&
+      v.type !== "gang" &&
+      v.type !== "resource")
   )
     return null;
   const id =

@@ -27,7 +27,7 @@ interface Row {
 
 const ownerKey = (owner: Owner): string => `${owner.type}:${owner.id}`;
 const isOwnerType = (v: string): v is OwnerType =>
-  v === "character" || v === "job" || v === "gang";
+  v === "character" || v === "job" || v === "gang" || v === "resource";
 const isState = (v: string): v is VehicleState =>
   v === "garage" || v === "out" || v === "impound";
 
