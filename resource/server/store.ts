@@ -1,67 +1,26 @@
-import { mysql } from "@aicore-fivem/mysql";
 import { WriteQueue } from "@aicore-fivem/lib/server";
-import {
-  normalizePlate,
-  toVehicleProps,
-  toVehicleSetup,
-} from "@aicore-fivem/lib/shared";
+import { normalizePlate } from "@aicore-fivem/lib/shared";
 import {
   plateFromId,
   type OwnedVehicle,
   type Owner,
-  type OwnerType,
   type PlateOwner,
   type VehicleState,
 } from "common/vehicles";
 import { log } from "./log";
 import { ownerFeed } from "./ownerFeed";
-
-interface Row {
-  id: number | string;
-  plate: string;
-  owner_type: string;
-  owner_id: string;
-  model: string;
-  props: string | null;
-  setup: string | null;
-  state: string;
-  garage: string | null;
-  fuel: number;
-  engine: number;
-  body: number;
-}
+import {
+  deleteVehicle,
+  fleetRows,
+  fromRow,
+  insertVehicle,
+  maxVehicleId,
+  ownerRows,
+  updateOwner,
+  updateVehicle,
+} from "./repo";
 
 const ownerKey = (owner: Owner): string => `${owner.type}:${owner.id}`;
-const isOwnerType = (v: string): v is OwnerType =>
-  v === "character" || v === "job" || v === "gang" || v === "resource";
-const isState = (v: string): v is VehicleState =>
-  v === "garage" || v === "out" || v === "impound";
-
-function fromRow(row: Row): OwnedVehicle | null {
-  if (!isOwnerType(row.owner_type)) return null;
-  let props = null;
-  let setup = null;
-  try {
-    props = row.props ? toVehicleProps(JSON.parse(row.props)) : null;
-    setup = row.setup ? toVehicleSetup(JSON.parse(row.setup)) : null;
-  } catch (error) {
-    log.error(`vehicle ${row.id} has broken props`, error);
-  }
-  return {
-    id: Number(row.id),
-    plate: row.plate,
-    owner: { type: row.owner_type, id: row.owner_id },
-    model: row.model,
-    props,
-    setup,
-    state: isState(row.state) ? row.state : "garage",
-    garage: row.garage,
-    fuel: row.fuel,
-    engine: row.engine,
-    body: row.body,
-  };
-}
-
 /**
  * Owned vehicles in memory: those of online owners (loaded at join) and every job / gang fleet (loaded at start).
  * Changes apply to memory at once and go to the database in order through one write queue; ids are assigned here,
@@ -78,13 +37,9 @@ class VehicleStore {
   private nextId = 1;
 
   async init(): Promise<void> {
-    const max = await mysql.scalar<number | string | null>(
-      "SELECT MAX(id) FROM ai_vehicles_owned",
-    );
+    const max = await maxVehicleId();
     this.nextId = Number(max ?? 0) + 1;
-    const fleets = await mysql.query<Row[]>(
-      "SELECT * FROM ai_vehicles_owned WHERE owner_type <> 'character'",
-    );
+    const fleets = await fleetRows();
     for (const row of fleets) this.add(fromRow(row));
     for (const type of ["job", "gang"] as const)
       this.loadedOwners.add(`${type}:*`);
@@ -114,10 +69,7 @@ class VehicleStore {
     const key = ownerKey(owner);
     if (this.loadedOwners.has(key)) return;
     this.loadedOwners.add(key);
-    const rows = await mysql.query<Row[]>(
-      "SELECT * FROM ai_vehicles_owned WHERE owner_type = ? AND owner_id = ?",
-      [owner.type, owner.id],
-    );
+    const rows = await ownerRows(owner);
     for (const row of rows)
       if (!this.byId.has(Number(row.id))) this.add(fromRow(row));
   }
@@ -175,10 +127,7 @@ class VehicleStore {
     };
     this.add(vehicle);
     this.writes.push(`create ${id}`, () =>
-      mysql.query(
-        "INSERT INTO ai_vehicles_owned (id, plate, owner_type, owner_id, model, state, garage) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [id, vehicle.plate, owner.type, owner.id, model, state, garage],
-      ),
+      insertVehicle(id, vehicle.plate, owner, model, state, garage),
     );
     return vehicle;
   }
@@ -196,21 +145,7 @@ class VehicleStore {
     if (!vehicle) return;
     Object.assign(vehicle, change);
     const v = { ...vehicle };
-    this.writes.push(`update ${id}`, () =>
-      mysql.query(
-        "UPDATE ai_vehicles_owned SET props = ?, setup = ?, state = ?, garage = ?, fuel = ?, engine = ?, body = ? WHERE id = ?",
-        [
-          v.props ? JSON.stringify(v.props) : null,
-          v.setup ? JSON.stringify(v.setup) : null,
-          v.state,
-          v.garage,
-          v.fuel,
-          v.engine,
-          v.body,
-          id,
-        ],
-      ),
-    );
+    this.writes.push(`update ${id}`, () => updateVehicle(id, v));
   }
 
   setOwner(id: number, owner: Owner): void {
@@ -219,19 +154,12 @@ class VehicleStore {
     this.byOwner.get(ownerKey(vehicle.owner))?.delete(id);
     vehicle.owner = owner;
     this.add(vehicle);
-    this.writes.push(`owner ${id}`, () =>
-      mysql.query(
-        "UPDATE ai_vehicles_owned SET owner_type = ?, owner_id = ? WHERE id = ?",
-        [owner.type, owner.id, id],
-      ),
-    );
+    this.writes.push(`owner ${id}`, () => updateOwner(id, owner));
   }
 
   remove(id: number): void {
     this.forget(id);
-    this.writes.push(`delete ${id}`, () =>
-      mysql.query("DELETE FROM ai_vehicles_owned WHERE id = ?", [id]),
-    );
+    this.writes.push(`delete ${id}`, () => deleteVehicle(id));
   }
 
   idle(): Promise<void> {

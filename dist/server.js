@@ -223,9 +223,9 @@ on("playerDropped", () => {
 	let source = Number(globalThis.source);
 	for (let gate of gates) gate.release(source);
 }), createLogger(GetCurrentResourceName());
-const resource$4 = GetCurrentResourceName(), pending$1 = new Map();
+const resource$5 = GetCurrentResourceName(), pending$1 = new Map();
 let nextId = 0;
-onNet(responseEvent(resource$4), (id, ok, result) => {
+onNet(responseEvent(resource$5), (id, ok, result) => {
 	let entry = typeof id == "number" ? pending$1.get(id) : void 0;
 	entry && entry.source === Number(globalThis.source) && (pending$1.delete(id), clearTimeout(entry.timer), ok === !0 ? entry.resolve(result) : entry.reject(Error("client callback failed")));
 });
@@ -240,11 +240,11 @@ function triggerClientCallback(name, source, args = [], timeoutMs = 3e4) {
 			resolve,
 			reject,
 			timer
-		}), emitNet(requestEvent(name), source, resource$4, id, ...args);
+		}), emitNet(requestEvent(name), source, resource$5, id, ...args);
 	});
 }
 // ../../../packages/lib/src/server/admin/validate.ts
-const core$26 = resourceExport(CORE.resource);
+const core$27 = resourceExport(CORE.resource);
 new class {
 	lists = new Map();
 	values(source) {
@@ -252,7 +252,7 @@ new class {
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$26.GetLookupValues(source);
+			list = core$27.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -260,8 +260,8 @@ new class {
 			values
 		}), values.size > 0 ? values : null;
 	}
-}(), resourceExport(CORE.resource), resourceExport(CORE.resource);
-// ../../../packages/lib/src/server/online.ts
+}(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
+// ../../../packages/lib/src/server/online/mirror.ts
 const core$23 = resourceExport(CORE.resource);
 function reindex(index, source, before, after) {
 	for (let name of before) {
@@ -273,7 +273,7 @@ function reindex(index, source, before, after) {
 		set || index.set(name, set = new Set()), set.add(source);
 	}
 }
-var OnlinePlayers = class {
+var OnlineMirror = class {
 	players = new Map();
 	onDuty = new Map();
 	jobIndex = new Map();
@@ -325,6 +325,7 @@ var OnlinePlayers = class {
 		let set = this.onDuty.get(job);
 		set || this.onDuty.set(job, set = new Set()), set.add(source);
 	}
+}, OnlinePlayers = class extends OnlineMirror {
 	sources() {
 		return this.start(), this.players.keys();
 	}
@@ -394,10 +395,6 @@ const EMPTY = new Set(), online = new OnlinePlayers(), core$22 = resourceExport(
 	give: (source, vehicle, purpose = "temporary") => core$22.GiveVehicleKeys(source, vehicle, purpose),
 	remove: (source, vehicle) => core$22.RemoveVehicleKeys(source, vehicle),
 	has: (source, vehicle) => core$22.HasVehicleKeys(source, vehicle)
-}, core$21 = resourceExport(CORE.resource), fuel = {
-	get: (vehicle) => core$21.GetVehicleFuel(vehicle),
-	set: (vehicle, level) => core$21.SetVehicleFuel(vehicle, level),
-	provider: () => core$21.GetFuelSystem()
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -416,14 +413,12 @@ async function vehicleType(model, asker) {
 	let seen = votes.get(hash) ?? new Map(), first = seen.get(answer);
 	return first !== void 0 && first !== asker ? (types.set(hash, answer), votes.delete(hash)) : (seen.set(answer, asker), votes.set(hash, seen)), answer;
 }
-async function seatPlayer(vehicle, source, seat) {
-	let ped = GetPlayerPed(String(source));
-	return ped ? waitFor(() => {
-		if (!DoesEntityExist(vehicle)) return !1;
-		if (GetPedInVehicleSeat(vehicle, seat) === ped) return !0;
-		SetPedIntoVehicle(ped, vehicle, seat);
-	}, 2e3, 150).catch(() => !1) : !1;
-}
+// ../../../packages/lib/src/server/fuel.ts
+const core$21 = resourceExport(CORE.resource), fuel = {
+	get: (vehicle) => core$21.GetVehicleFuel(vehicle),
+	set: (vehicle, level) => core$21.SetVehicleFuel(vehicle, level),
+	provider: () => core$21.GetFuelSystem()
+};
 function randomPlate(prefix) {
 	let digit = () => String(Math.floor(Math.random() * 10));
 	if (prefix !== void 0) {
@@ -433,6 +428,15 @@ function randomPlate(prefix) {
 	}
 	let letter = () => "ABCDEFGHJKLMNPRSTUVWXYZ"[Math.floor(Math.random() * 23)] ?? "A";
 	return `${digit()}${digit()}${letter()}${letter()}${letter()}${digit()}${digit()}${digit()}`;
+}
+// ../../../packages/lib/src/server/vehicle/spawn.ts
+async function seatPlayer(vehicle, source, seat) {
+	let ped = GetPlayerPed(String(source));
+	return ped ? waitFor(() => {
+		if (!DoesEntityExist(vehicle)) return !1;
+		if (GetPedInVehicleSeat(vehicle, seat) === ped) return !0;
+		SetPedIntoVehicle(ped, vehicle, seat);
+	}, 2e3, 150).catch(() => !1) : !1;
 }
 async function spawnVehicle$1(options) {
 	let type = options.asker === void 0 ? options.type ?? "automobile" : await vehicleType(options.model, options.asker);
@@ -539,10 +543,10 @@ new class {
 		let def = this.gangs.get(name);
 		return def === void 0 && this.gangs.set(name, def = core$19.GetGangDefinition(name) ?? null), def;
 	}
-}();
-// ../../../packages/lib/src/server/command.ts
+}(), createLogger(GetCurrentResourceName());
+// ../../../packages/lib/src/server/command/commandSet.ts
 const resource$3 = GetCurrentResourceName();
-createLogger(resource$3), new class {
+new class {
 	list = [];
 	sent = new Map();
 	announced = 0;
@@ -14865,7 +14869,7 @@ async function createDatabaseTables(resource, file) {
 		else for (let [name, definition] of statement.columns) columns.has(name) || (await mysql.query(`ALTER TABLE \`${statement.table}\` ADD COLUMN ${definition}`), log$1.info(`^2added column ${statement.table}.${name}^7 (${resource})`));
 	}
 }
-// ../../../packages/lib/src/fivem/scheduler.ts
+// ../../../packages/lib/src/fivem/scheduler/group.ts
 var Group = class {
 	interval;
 	jobs = Array(8);
@@ -14951,7 +14955,7 @@ new class {
 		}
 		groups.length = kept, this.nextDue = soonest;
 	};
-}(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
+}(), IsDuplicityVersion(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/index.ts
 var WriteQueue = class {
 	onError;
@@ -14966,12 +14970,14 @@ var WriteQueue = class {
 		return this.tail;
 	}
 };
+// resource/common/vehicles.ts
+const plateFromId = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8);
 createLocale();
 // resource/common/resource.ts
 const ResourceName = GetCurrentResourceName();
 IsDuplicityVersion();
 // resource/server/log.ts
-const log = createLogger(ResourceName), plateFromId = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8), ownerFeed = new class {
+const log = createLogger(ResourceName), ownerFeed = new class {
 	puts = new Map();
 	removes = new Set();
 	queued = !1;
@@ -14992,7 +14998,7 @@ const log = createLogger(ResourceName), plateFromId = (id) => `AI${id.toString(3
 			this.puts.clear(), this.removes.clear(), emit(VEHICLES_EVENTS.owners, puts, removes);
 		}));
 	}
-}(), ownerKey = (owner) => `${owner.type}:${owner.id}`, isOwnerType = (v) => v === "character" || v === "job" || v === "gang" || v === "resource", isState$1 = (v) => v === "garage" || v === "out" || v === "impound";
+}(), isOwnerType = (v) => v === "character" || v === "job" || v === "gang" || v === "resource", isState$1 = (v) => v === "garage" || v === "out" || v === "impound";
 function fromRow(row) {
 	if (!isOwnerType(row.owner_type)) return null;
 	let props = null, setup = null;
@@ -15018,7 +15024,28 @@ function fromRow(row) {
 		body: row.body
 	};
 }
-const vehicles = new class {
+const maxVehicleId = () => mysql.scalar("SELECT MAX(id) FROM ai_vehicles_owned"), fleetRows = () => mysql.query("SELECT * FROM ai_vehicles_owned WHERE owner_type <> 'character'"), ownerRows = (owner) => mysql.query("SELECT * FROM ai_vehicles_owned WHERE owner_type = ? AND owner_id = ?", [owner.type, owner.id]), insertVehicle = (id, plate, owner, model, state, garage) => mysql.query("INSERT INTO ai_vehicles_owned (id, plate, owner_type, owner_id, model, state, garage) VALUES (?, ?, ?, ?, ?, ?, ?)", [
+	id,
+	plate,
+	owner.type,
+	owner.id,
+	model,
+	state,
+	garage
+]), updateVehicle = (id, v) => mysql.query("UPDATE ai_vehicles_owned SET props = ?, setup = ?, state = ?, garage = ?, fuel = ?, engine = ?, body = ? WHERE id = ?", [
+	v.props ? JSON.stringify(v.props) : null,
+	v.setup ? JSON.stringify(v.setup) : null,
+	v.state,
+	v.garage,
+	v.fuel,
+	v.engine,
+	v.body,
+	id
+]), updateOwner = (id, owner) => mysql.query("UPDATE ai_vehicles_owned SET owner_type = ?, owner_id = ? WHERE id = ?", [
+	owner.type,
+	owner.id,
+	id
+]), deleteVehicle = (id) => mysql.query("DELETE FROM ai_vehicles_owned WHERE id = ?", [id]), ownerKey = (owner) => `${owner.type}:${owner.id}`, vehicles = new class {
 	byId = new Map();
 	byPlate = new Map();
 	byOwner = new Map();
@@ -15026,9 +15053,9 @@ const vehicles = new class {
 	writes = new WriteQueue((label, error) => log.error(`write failed (${label})`, error));
 	nextId = 1;
 	async init() {
-		let max = await mysql.scalar("SELECT MAX(id) FROM ai_vehicles_owned");
+		let max = await maxVehicleId();
 		this.nextId = Number(max ?? 0) + 1;
-		let fleets = await mysql.query("SELECT * FROM ai_vehicles_owned WHERE owner_type <> 'character'");
+		let fleets = await fleetRows();
 		for (let row of fleets) this.add(fromRow(row));
 		for (let type of ["job", "gang"]) this.loadedOwners.add(`${type}:*`);
 	}
@@ -15046,7 +15073,7 @@ const vehicles = new class {
 		let key = ownerKey(owner);
 		if (this.loadedOwners.has(key)) return;
 		this.loadedOwners.add(key);
-		let rows = await mysql.query("SELECT * FROM ai_vehicles_owned WHERE owner_type = ? AND owner_id = ?", [owner.type, owner.id]);
+		let rows = await ownerRows(owner);
 		for (let row of rows) this.byId.has(Number(row.id)) || this.add(fromRow(row));
 	}
 	unloadOwner(owner, keep) {
@@ -15087,42 +15114,21 @@ const vehicles = new class {
 			engine: 1e3,
 			body: 1e3
 		};
-		return this.add(vehicle), this.writes.push(`create ${id}`, () => mysql.query("INSERT INTO ai_vehicles_owned (id, plate, owner_type, owner_id, model, state, garage) VALUES (?, ?, ?, ?, ?, ?, ?)", [
-			id,
-			vehicle.plate,
-			owner.type,
-			owner.id,
-			model,
-			state,
-			garage
-		])), vehicle;
+		return this.add(vehicle), this.writes.push(`create ${id}`, () => insertVehicle(id, vehicle.plate, owner, model, state, garage)), vehicle;
 	}
 	update(id, change) {
 		let vehicle = this.byId.get(id);
 		if (!vehicle) return;
 		Object.assign(vehicle, change);
 		let v = { ...vehicle };
-		this.writes.push(`update ${id}`, () => mysql.query("UPDATE ai_vehicles_owned SET props = ?, setup = ?, state = ?, garage = ?, fuel = ?, engine = ?, body = ? WHERE id = ?", [
-			v.props ? JSON.stringify(v.props) : null,
-			v.setup ? JSON.stringify(v.setup) : null,
-			v.state,
-			v.garage,
-			v.fuel,
-			v.engine,
-			v.body,
-			id
-		]));
+		this.writes.push(`update ${id}`, () => updateVehicle(id, v));
 	}
 	setOwner(id, owner) {
 		let vehicle = this.byId.get(id);
-		vehicle && (this.byOwner.get(ownerKey(vehicle.owner))?.delete(id), vehicle.owner = owner, this.add(vehicle), this.writes.push(`owner ${id}`, () => mysql.query("UPDATE ai_vehicles_owned SET owner_type = ?, owner_id = ? WHERE id = ?", [
-			owner.type,
-			owner.id,
-			id
-		])));
+		vehicle && (this.byOwner.get(ownerKey(vehicle.owner))?.delete(id), vehicle.owner = owner, this.add(vehicle), this.writes.push(`owner ${id}`, () => updateOwner(id, owner)));
 	}
 	remove(id) {
-		this.forget(id), this.writes.push(`delete ${id}`, () => mysql.query("DELETE FROM ai_vehicles_owned WHERE id = ?", [id]));
+		this.forget(id), this.writes.push(`delete ${id}`, () => deleteVehicle(id));
 	}
 	idle() {
 		return this.writes.idle();
@@ -15249,7 +15255,51 @@ function storeVehicle(id, garage, state = "garage") {
 		garage
 	});
 }
-// resource/server/qbxProps.ts
+// resource/server/exports.ts
+const isState = (v) => v === "garage" || v === "out" || v === "impound";
+registerExport("CreateVehicle", (owner, model, garage, props) => {
+	let o = toOwner(owner);
+	if (!o || typeof model != "string") return null;
+	let v = createVehicle(o, model, typeof garage == "string" ? garage : null, props);
+	return {
+		id: v.id,
+		plate: v.plate
+	};
+}), registerExport("GetVehicle", (ref) => find(ref) ?? null), registerExport("GetVehicles", (owner) => {
+	let o = toOwner(owner);
+	return o ? vehicles.ofOwner(o) : [];
+}), registerExport("GetPlateOwners", () => vehicles.plateOwners()), registerExport("IsOwnedPlate", (plate) => typeof plate == "string" && vehicles.byPlateText(plate) !== void 0), registerExport("GetVehicleIdByEntity", (entity) => typeof entity == "number" ? world.idOf(entity) ?? null : null), registerExport("GetEntity", (id) => typeof id == "number" ? world.entityOf(id) ?? null : null), registerExport("SaveVehicle", (id, change) => {
+	typeof id == "number" && isRecord(change) && saveVehicle(id, {
+		...change,
+		state: isState(change.state) ? change.state : void 0,
+		garage: typeof change.garage == "string" ? change.garage : void 0
+	});
+}), registerExport("SaveTuning", (id, props) => {
+	typeof id == "number" && saveVehicle(id, { props }, !0);
+}), registerExport("StoreVehicle", (id, garage, state) => {
+	typeof id == "number" && storeVehicle(id, typeof garage == "string" ? garage : null, isState(state) ? state : "garage");
+}), registerExport("SetOwner", (id, owner) => {
+	let o = toOwner(owner);
+	typeof id == "number" && o && vehicles.setOwner(id, o);
+}), registerExport("DeleteVehicle", (id) => {
+	typeof id == "number" && (world.despawn(id), vehicles.remove(id));
+}), registerExport("SpawnVehicle", (id, at, asker, cb, purpose, setup) => {
+	if (typeof id != "number" || !isRecord(at) || typeof asker != "number") return;
+	let [x, y, z] = [
+		readFinite(at.x),
+		readFinite(at.y),
+		readFinite(at.z)
+	];
+	x !== null && y !== null && z !== null && spawnVehicle(id, {
+		x,
+		y,
+		z,
+		heading: readFinite(at.heading ?? at.w) ?? 0
+	}, asker, toKeyPurpose(purpose ?? "garage"), setup ?? void 0).then((netId) => {
+		typeof cb == "function" && cb(netId);
+	});
+});
+// resource/server/qbx/props.ts
 const MOD_NAMES = "modSpoilers.modFrontBumper.modRearBumper.modSideSkirt.modExhaust.modFrame.modGrille.modHood.modFender.modRightFender.modRoof.modEngine.modBrakes.modTransmission.modHorns.modSuspension.modArmor.modNitrous.modTurbo.modSubwoofer.modSmokeEnabled.modHydraulics.modXenon.modFrontWheels.modBackWheels.modPlateHolder.modVanityPlate.modTrimA.modOrnaments.modDashboard.modDial.modDoorSpeaker.modSeats.modSteeringWheel.modShifterLeavers.modAPlate.modSpeakers.modTrunk.modHydrolic.modEngineBlock.modAirFilter.modStruts.modArchCover.modAerials.modTrimB.modTank.modWindows.modDoorR.modLivery.modLightbar".split("."), TOGGLE_MODS = new Set([
 	17,
 	18,
@@ -15326,50 +15376,8 @@ function readQbxProps(value, entityModel) {
 	let props = toVehicleProps(value) ?? fromFrameworkProps(value);
 	return props && props.model === entityModel ? props : null;
 }
-// resource/server/exports.ts
-const core = resourceExport("ai-core"), isState = (v) => v === "garage" || v === "out" || v === "impound";
-registerExport("CreateVehicle", (owner, model, garage, props) => {
-	let o = toOwner(owner);
-	if (!o || typeof model != "string") return null;
-	let v = createVehicle(o, model, typeof garage == "string" ? garage : null, props);
-	return {
-		id: v.id,
-		plate: v.plate
-	};
-}), registerExport("GetVehicle", (ref) => find(ref) ?? null), registerExport("GetVehicles", (owner) => {
-	let o = toOwner(owner);
-	return o ? vehicles.ofOwner(o) : [];
-}), registerExport("GetPlateOwners", () => vehicles.plateOwners()), registerExport("IsOwnedPlate", (plate) => typeof plate == "string" && vehicles.byPlateText(plate) !== void 0), registerExport("GetVehicleIdByEntity", (entity) => typeof entity == "number" ? world.idOf(entity) ?? null : null), registerExport("GetEntity", (id) => typeof id == "number" ? world.entityOf(id) ?? null : null), registerExport("SaveVehicle", (id, change) => {
-	typeof id == "number" && isRecord(change) && saveVehicle(id, {
-		...change,
-		state: isState(change.state) ? change.state : void 0,
-		garage: typeof change.garage == "string" ? change.garage : void 0
-	});
-}), registerExport("SaveTuning", (id, props) => {
-	typeof id == "number" && saveVehicle(id, { props }, !0);
-}), registerExport("StoreVehicle", (id, garage, state) => {
-	typeof id == "number" && storeVehicle(id, typeof garage == "string" ? garage : null, isState(state) ? state : "garage");
-}), registerExport("SetOwner", (id, owner) => {
-	let o = toOwner(owner);
-	typeof id == "number" && o && vehicles.setOwner(id, o);
-}), registerExport("DeleteVehicle", (id) => {
-	typeof id == "number" && (world.despawn(id), vehicles.remove(id));
-}), registerExport("SpawnVehicle", (id, at, asker, cb, purpose, setup) => {
-	if (typeof id != "number" || !isRecord(at) || typeof asker != "number") return;
-	let [x, y, z] = [
-		readFinite(at.x),
-		readFinite(at.y),
-		readFinite(at.z)
-	];
-	x !== null && y !== null && z !== null && spawnVehicle(id, {
-		x,
-		y,
-		z,
-		heading: readFinite(at.heading ?? at.w) ?? 0
-	}, asker, toKeyPurpose(purpose ?? "garage"), setup ?? void 0).then((netId) => {
-		typeof cb == "function" && cb(netId);
-	});
-});
+// resource/server/qbx/index.ts
+const core = resourceExport("ai-core");
 function qbxView(v) {
 	let source = v.owner.type === "character" ? core.GetSourceByCharId(Number(v.owner.id)) : null, citizenid = source === null ? null : core.GetCharacter(source)?.citizenid ?? null;
 	return {
@@ -15438,7 +15446,7 @@ const qbx = {
 	}
 };
 for (let [name, fn] of Object.entries(qbx)) provideExport("qbx_vehicles", name, fn);
-// resource/server/index.ts
+// resource/server/characters.ts
 const characterOwner = (id) => ({
 	type: "character",
 	id: String(id)
