@@ -1,6 +1,6 @@
 {
   "name": "ai-vehicles",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Owned vehicles: storage, spawning and the qbx_vehicles API",
   "license": "GPL-3.0-only",
