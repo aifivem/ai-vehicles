@@ -244,7 +244,7 @@ function triggerClientCallback(name, source, args = [], timeoutMs = 3e4) {
 	});
 }
 // ../../../packages/lib/src/server/admin/validate.ts
-const core$27 = resourceExport(CORE.resource);
+const core$28 = resourceExport(CORE.resource);
 new class {
 	lists = new Map();
 	values(source) {
@@ -252,7 +252,7 @@ new class {
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$27.GetLookupValues(source);
+			list = core$28.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -262,7 +262,7 @@ new class {
 	}
 }(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/online/mirror.ts
-const core$23 = resourceExport(CORE.resource);
+const core$24 = resourceExport(CORE.resource);
 function reindex(index, source, before, after) {
 	for (let name of before) {
 		let set = index.get(name);
@@ -278,6 +278,7 @@ var OnlineMirror = class {
 	onDuty = new Map();
 	jobIndex = new Map();
 	gangIndex = new Map();
+	byCitizenid = new Map();
 	started = !1;
 	start() {
 		if (this.started) return;
@@ -290,17 +291,17 @@ var OnlineMirror = class {
 				gangs: [],
 				gangNames: [],
 				duty: null
-			}), this.setJobs(source, core$23.GetJobs(source) ?? []), this.setGangs(source, core$23.GetGangs(source) ?? []), this.setDuty(source, core$23.GetDutyJob(source));
+			}), this.byCitizenid.set(character.citizenid, source), this.setJobs(source, core$24.GetJobs(source) ?? []), this.setGangs(source, core$24.GetGangs(source) ?? []), this.setDuty(source, core$24.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (let source of core$23.GetLoadedSources()) {
-			let character = core$23.GetCharacter(source);
+		for (let source of core$24.GetLoadedSources()) {
+			let character = core$24.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
 	drop(source) {
 		let player = this.players.get(source);
-		player && (this.setDuty(source, null), reindex(this.jobIndex, source, player.jobNames, []), reindex(this.gangIndex, source, player.gangNames, []), this.players.delete(source));
+		player && (this.setDuty(source, null), reindex(this.jobIndex, source, player.jobNames, []), reindex(this.gangIndex, source, player.gangNames, []), this.byCitizenid.delete(player.character.citizenid), this.players.delete(source));
 	}
 	setJobs(source, jobs) {
 		let player = this.players.get(source);
@@ -334,6 +335,15 @@ var OnlineMirror = class {
 	}
 	character(source) {
 		return this.start(), this.players.get(source)?.character ?? null;
+	}
+	sourceOf(citizenid) {
+		return this.start(), this.byCitizenid.get(citizenid) ?? null;
+	}
+	characters() {
+		this.start();
+		let out = new Map();
+		for (let [source, player] of this.players) out.set(source, player.character);
+		return out;
 	}
 	charId(source) {
 		return this.start(), this.players.get(source)?.character.id;
@@ -391,10 +401,10 @@ var OnlineMirror = class {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY = new Set(), online = new OnlinePlayers(), core$22 = resourceExport(CORE.resource), vehicleKeys = {
-	give: (source, vehicle, purpose = "temporary") => core$22.GiveVehicleKeys(source, vehicle, purpose),
-	remove: (source, vehicle) => core$22.RemoveVehicleKeys(source, vehicle),
-	has: (source, vehicle) => core$22.HasVehicleKeys(source, vehicle)
+const EMPTY = new Set(), online = new OnlinePlayers(), core$23 = resourceExport(CORE.resource), vehicleKeys = {
+	give: (source, vehicle, purpose = "temporary") => core$23.GiveVehicleKeys(source, vehicle, purpose),
+	remove: (source, vehicle) => core$23.RemoveVehicleKeys(source, vehicle),
+	has: (source, vehicle) => core$23.HasVehicleKeys(source, vehicle)
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -414,10 +424,10 @@ async function vehicleType(model, asker) {
 	return first !== void 0 && first !== asker ? (types.set(hash, answer), votes.delete(hash)) : (seen.set(answer, asker), votes.set(hash, seen)), answer;
 }
 // ../../../packages/lib/src/server/fuel.ts
-const core$21 = resourceExport(CORE.resource), fuel = {
-	get: (vehicle) => core$21.GetVehicleFuel(vehicle),
-	set: (vehicle, level) => core$21.SetVehicleFuel(vehicle, level),
-	provider: () => core$21.GetFuelSystem()
+const core$22 = resourceExport(CORE.resource), fuel = {
+	get: (vehicle) => core$22.GetVehicleFuel(vehicle),
+	set: (vehicle, level) => core$22.SetVehicleFuel(vehicle, level),
+	provider: () => core$22.GetFuelSystem()
 };
 function randomPlate(prefix) {
 	let digit = () => String(Math.floor(Math.random() * 10));
@@ -514,7 +524,7 @@ on(CORE.playerUnloadedEvent, (source) => {
 	settle && settle(!1);
 });
 // ../../../packages/lib/src/server/definitions.ts
-const core$19 = resourceExport("ai-core");
+const core$20 = resourceExport("ai-core");
 new class {
 	jobs = new Map();
 	gangs = new Map();
@@ -525,23 +535,23 @@ new class {
 	}
 	job(name) {
 		let def = this.jobs.get(name);
-		return def === void 0 && this.jobs.set(name, def = core$19.GetJobDefinition(name) ?? null), def;
+		return def === void 0 && this.jobs.set(name, def = core$20.GetJobDefinition(name) ?? null), def;
 	}
 	registerJob(name, definition) {
-		return core$19.RegisterJobDefinition(name, definition);
+		return core$20.RegisterJobDefinition(name, definition);
 	}
 	removeJob(name) {
-		return core$19.RemoveJobDefinition(name);
+		return core$20.RemoveJobDefinition(name);
 	}
 	registerGang(name, definition) {
-		return core$19.RegisterGangDefinition(name, definition);
+		return core$20.RegisterGangDefinition(name, definition);
 	}
 	removeGang(name) {
-		return core$19.RemoveGangDefinition(name);
+		return core$20.RemoveGangDefinition(name);
 	}
 	gang(name) {
 		let def = this.gangs.get(name);
-		return def === void 0 && this.gangs.set(name, def = core$19.GetGangDefinition(name) ?? null), def;
+		return def === void 0 && this.gangs.set(name, def = core$20.GetGangDefinition(name) ?? null), def;
 	}
 }(), createLogger(GetCurrentResourceName());
 // ../../../packages/lib/src/server/command/commandSet.ts
@@ -14955,7 +14965,7 @@ new class {
 		}
 		groups.length = kept, this.nextDue = soonest;
 	};
-}(), IsDuplicityVersion(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
+}(), IsDuplicityVersion(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/index.ts
 var WriteQueue = class {
 	onError;
@@ -15045,7 +15055,7 @@ const maxVehicleId = () => mysql.scalar("SELECT MAX(id) FROM ai_vehicles_owned")
 	owner.type,
 	owner.id,
 	id
-]), deleteVehicle = (id) => mysql.query("DELETE FROM ai_vehicles_owned WHERE id = ?", [id]), ownerKey = (owner) => `${owner.type}:${owner.id}`, vehicles = new class {
+]), plateRow = (plate) => mysql.single("SELECT * FROM ai_vehicles_owned WHERE plate = ?", [plate]), updatePlate = (id, plate) => mysql.query("UPDATE ai_vehicles_owned SET plate = ? WHERE id = ?", [plate, id]), deleteVehicle = (id) => mysql.query("DELETE FROM ai_vehicles_owned WHERE id = ?", [id]), GENERATED = /^AI[0-9A-Z]+$/, PLATE = /^[A-Z0-9](?:[A-Z0-9 ]{0,6}[A-Z0-9])?$/, ownerKey = (owner) => `${owner.type}:${owner.id}`, vehicles = new class {
 	byId = new Map();
 	byPlate = new Map();
 	byOwner = new Map();
@@ -15096,6 +15106,19 @@ const maxVehicleId = () => mysql.scalar("SELECT MAX(id) FROM ai_vehicles_owned")
 			v.owner.id
 		]);
 		return list;
+	}
+	async findByPlate(plate) {
+		let loaded = this.byPlateText(plate);
+		if (loaded) return loaded;
+		let row = await plateRow(normalizePlate(plate));
+		return row ? fromRow(row) : null;
+	}
+	async ofOwnerAnywhere(owner) {
+		return this.loadedOwners.has(ownerKey(owner)) || owner.type !== "character" ? this.ofOwner(owner) : (await ownerRows(owner)).flatMap((row) => fromRow(row) ?? []);
+	}
+	async setPlate(id, plate) {
+		let next = normalizePlate(plate), vehicle = this.byId.get(id);
+		return !vehicle || !PLATE.test(next) || GENERATED.test(next) ? !1 : next === vehicle.plate ? !0 : this.byPlate.has(next) || await plateRow(next) || this.byPlate.has(next) || this.byId.get(id) !== vehicle ? !1 : (this.byPlate.delete(vehicle.plate), ownerFeed.remove(vehicle.plate), vehicle.plate = next, this.byPlate.set(next, id), ownerFeed.put(vehicle), this.writes.push(`plate ${id}`, () => updatePlate(id, next)), !0);
 	}
 	ofOwner(owner) {
 		return [...this.byOwner.get(ownerKey(owner)) ?? []].flatMap((id) => this.byId.get(id) ?? []);
@@ -15268,7 +15291,24 @@ registerExport("CreateVehicle", (owner, model, garage, props) => {
 }), registerExport("GetVehicle", (ref) => find(ref) ?? null), registerExport("GetVehicles", (owner) => {
 	let o = toOwner(owner);
 	return o ? vehicles.ofOwner(o) : [];
-}), registerExport("GetPlateOwners", () => vehicles.plateOwners()), registerExport("IsOwnedPlate", (plate) => typeof plate == "string" && vehicles.byPlateText(plate) !== void 0), registerExport("GetVehicleIdByEntity", (entity) => typeof entity == "number" ? world.idOf(entity) ?? null : null), registerExport("GetEntity", (id) => typeof id == "number" ? world.entityOf(id) ?? null : null), registerExport("SaveVehicle", (id, change) => {
+}), registerExport("GetPlateOwners", () => vehicles.plateOwners()), registerExport("FindVehicle", (plate, done) => {
+	if (typeof done != "function") return;
+	let answer = done;
+	if (typeof plate != "string") return answer(null);
+	vehicles.findByPlate(plate).then(answer, () => answer(null));
+}), registerExport("GetVehiclesOf", (owner, done) => {
+	if (typeof done != "function") return;
+	let answer = done, o = toOwner(owner);
+	if (!o) return answer([]);
+	vehicles.ofOwnerAnywhere(o).then(answer, () => answer([]));
+}), registerExport("SetPlate", (id, plate, done) => {
+	let answer = typeof done == "function" ? done : () => {};
+	if (typeof id != "number" || typeof plate != "string") return answer(!1);
+	vehicles.setPlate(id, plate).then((ok) => {
+		let entity = ok ? world.entityOf(id) : void 0;
+		entity && SetVehicleNumberPlateText(entity, plate), answer(ok);
+	}, () => answer(!1));
+}), registerExport("IsOwnedPlate", (plate) => typeof plate == "string" && vehicles.byPlateText(plate) !== void 0), registerExport("GetVehicleIdByEntity", (entity) => typeof entity == "number" ? world.idOf(entity) ?? null : null), registerExport("GetEntity", (id) => typeof id == "number" ? world.entityOf(id) ?? null : null), registerExport("SaveVehicle", (id, change) => {
 	typeof id == "number" && isRecord(change) && saveVehicle(id, {
 		...change,
 		state: isState(change.state) ? change.state : void 0,

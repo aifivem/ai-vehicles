@@ -37,6 +37,35 @@ registerExport("GetVehicles", (owner: unknown) => {
   return o ? vehicles.ofOwner(o) : [];
 });
 registerExport("GetPlateOwners", () => vehicles.plateOwners());
+/** A vehicle by plate, also of an owner who is not online (from the database); `done(vehicle | null)`. */
+registerExport("FindVehicle", (plate: unknown, done: unknown) => {
+  if (typeof done !== "function") return;
+  const answer = done as (vehicle: unknown) => void;
+  if (typeof plate !== "string") return answer(null);
+  void vehicles.findByPlate(plate).then(answer, () => answer(null));
+});
+/** An owner's vehicles, also of a character who is not online (from the database); `done(vehicles)`. */
+registerExport("GetVehiclesOf", (owner: unknown, done: unknown) => {
+  if (typeof done !== "function") return;
+  const answer = done as (list: unknown) => void;
+  const o = toOwner(owner);
+  if (!o) return answer([]);
+  void vehicles.ofOwnerAnywhere(o).then(answer, () => answer([]));
+});
+/** Another plate for a vehicle (custom plate, plate changer; the entity in the world too); `done(ok)`. */
+registerExport("SetPlate", (id: unknown, plate: unknown, done?: unknown) => {
+  const answer =
+    typeof done === "function" ? (done as (ok: boolean) => void) : () => {};
+  if (typeof id !== "number" || typeof plate !== "string") return answer(false);
+  void vehicles.setPlate(id, plate).then(
+    (ok) => {
+      const entity = ok ? world.entityOf(id) : undefined;
+      if (entity) SetVehicleNumberPlateText(entity, plate);
+      answer(ok);
+    },
+    () => answer(false),
+  );
+});
 registerExport(
   "IsOwnedPlate",
   (plate: unknown) =>

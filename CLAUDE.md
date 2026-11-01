@@ -16,6 +16,7 @@ Owned vehicles: storage, ownership (characters, jobs, gangs), spawning on the se
 - Types and export signatures: `@aicore-fivem/shared` `vehicles.ts` (`AiVehiclesServerExports`, `VEHICLE_BAGS`).
 - qbx_vehicles exports: `server/qbx/index.ts` (citizenid filters need the owner online).
 - Plate -> owner mirror for other resources (ai-vehiclekeys): export `GetPlateOwners()` -> `[plate, ownerType, ownerId][]` (every vehicle in memory, read once at the consumer's start) and the local server event `ai-vehicles:owners (puts, removes)` (`OWNERS_EVENT` in `resource/common/vehicles.ts`): vehicles that entered memory or changed owner as the same triples, plates that left memory; one batch per tick (`server/ownerFeed.ts`, fed by the store's add / forget). Neither is in `@aicore-fivem/shared` yet.
+- Owners who are not online: `FindVehicle(plate, done)` and `GetVehiclesOf(owner, done)` read the table (memory first, rows not loaded). `SetPlate(id, plate, done)`: a custom plate (1-8 letters / digits) for a vehicle in memory, checked against memory and the table; generated `AI...` plates are reserved, so the two never collide.
 - Table `ai_vehicles_owned` (`sql/main.sql`).
 
 ## Entry points

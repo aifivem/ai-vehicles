@@ -16,9 +16,16 @@ import {
   insertVehicle,
   maxVehicleId,
   ownerRows,
+  plateRow,
   updateOwner,
+  updatePlate,
   updateVehicle,
 } from "./repo";
+
+/** Generated plates (`plateFromId`) start with this: a custom plate never does, so the two never collide. */
+const GENERATED = /^AI[0-9A-Z]+$/;
+/** What a custom plate may be: GTA's 8 characters, letters, digits and inner spaces. */
+const PLATE = /^[A-Z0-9](?:[A-Z0-9 ]{0,6}[A-Z0-9])?$/;
 
 const ownerKey = (owner: Owner): string => `${owner.type}:${owner.id}`;
 /**
@@ -97,6 +104,43 @@ class VehicleStore {
     for (const v of this.byId.values())
       list.push([v.plate, v.owner.type, v.owner.id]);
     return list;
+  }
+
+  /** A vehicle by plate, in memory or (an owner not online) from the database; not loaded into memory. */
+  async findByPlate(plate: string): Promise<OwnedVehicle | null> {
+    const loaded = this.byPlateText(plate);
+    if (loaded) return loaded;
+    const row = await plateRow(normalizePlate(plate));
+    return row ? fromRow(row) : null;
+  }
+
+  /** An owner's vehicles: from memory while loaded, else from the database (not loaded into memory). */
+  async ofOwnerAnywhere(owner: Owner): Promise<OwnedVehicle[]> {
+    if (this.loadedOwners.has(ownerKey(owner)) || owner.type !== "character")
+      return this.ofOwner(owner);
+    const rows = await ownerRows(owner);
+    return rows.flatMap((row) => fromRow(row) ?? []);
+  }
+
+  /**
+   * Gives a vehicle in memory another plate (a custom plate, a plate changer); false when the plate is not valid, is a
+   * generated one or is taken (memory and database). The entity in the world gets it too.
+   */
+  async setPlate(id: number, plate: string): Promise<boolean> {
+    const next = normalizePlate(plate);
+    const vehicle = this.byId.get(id);
+    if (!vehicle || !PLATE.test(next) || GENERATED.test(next)) return false;
+    if (next === vehicle.plate) return true;
+    if (this.byPlate.has(next) || (await plateRow(next))) return false;
+    // another change may have taken it meanwhile
+    if (this.byPlate.has(next) || this.byId.get(id) !== vehicle) return false;
+    this.byPlate.delete(vehicle.plate);
+    ownerFeed.remove(vehicle.plate);
+    vehicle.plate = next;
+    this.byPlate.set(next, id);
+    ownerFeed.put(vehicle);
+    this.writes.push(`plate ${id}`, () => updatePlate(id, next));
+    return true;
   }
 
   ofOwner(owner: Owner): OwnedVehicle[] {

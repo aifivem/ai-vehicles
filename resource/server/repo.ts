@@ -104,5 +104,13 @@ export const updateOwner = (id: number, owner: Owner) =>
     [owner.type, owner.id, id],
   );
 
+/** A vehicle's row by plate (an owner who is not online). */
+export const plateRow = (plate: string) =>
+  mysql.single<Row>("SELECT * FROM ai_vehicles_owned WHERE plate = ?", [plate]);
+export const updatePlate = (id: number, plate: string) =>
+  mysql.query("UPDATE ai_vehicles_owned SET plate = ? WHERE id = ?", [
+    plate,
+    id,
+  ]);
 export const deleteVehicle = (id: number) =>
   mysql.query("DELETE FROM ai_vehicles_owned WHERE id = ?", [id]);
