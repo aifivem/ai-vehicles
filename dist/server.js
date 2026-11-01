@@ -121,6 +121,9 @@ const CORE = {
 	activeGangChangedEvent: "ai-core:activeGangChanged",
 	metaChangedEvent: "ai-core:metaChanged",
 	definitionsChangedEvent: "ai-core:definitionsChanged",
+	characterDeletedEvent: "ai-core:characterDeleted",
+	runtimeJobPrefix: "ai:jobdef:",
+	runtimeGangPrefix: "ai:gangdef:",
 	characterScreenEvent: "ai-core:characterScreen",
 	inventoryChangedEvent: "ai-core:inventoryChanged",
 	itemUsedEvent: "ai-core:itemUsed",
@@ -151,7 +154,11 @@ const CORE = {
 	spawnEvent: "ai-core:client:spawn",
 	chooseSpawnEvent: "ai-core:client:chooseSpawn",
 	spawnChoiceCallback: "ai-core:spawnChoice",
-	openCharactersEvent: "ai-core:client:openCharacters"
+	openCharactersEvent: "ai-core:client:openCharacters",
+	characterScreenKey: "ai:characterScreen",
+	externalLoadedEvent: "ai-core:client:externalLoaded",
+	externalSpawnedEvent: "ai-core:externalSpawned",
+	externalLogoutEvent: "ai-core:client:externalLogout"
 }, KEY_PURPOSES = [
 	"purchase",
 	"garage",
@@ -237,7 +244,7 @@ function triggerClientCallback(name, source, args = [], timeoutMs = 3e4) {
 	});
 }
 // ../../../packages/lib/src/server/admin/validate.ts
-const core$25 = resourceExport(CORE.resource);
+const core$26 = resourceExport(CORE.resource);
 new class {
 	lists = new Map();
 	values(source) {
@@ -245,7 +252,7 @@ new class {
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$25.GetLookupValues(source);
+			list = core$26.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -255,7 +262,7 @@ new class {
 	}
 }(), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/online.ts
-const core$22 = resourceExport(CORE.resource);
+const core$23 = resourceExport(CORE.resource);
 function reindex(index, source, before, after) {
 	for (let name of before) {
 		let set = index.get(name);
@@ -283,11 +290,11 @@ var OnlinePlayers = class {
 				gangs: [],
 				gangNames: [],
 				duty: null
-			}), this.setJobs(source, core$22.GetJobs(source) ?? []), this.setGangs(source, core$22.GetGangs(source) ?? []), this.setDuty(source, core$22.GetDutyJob(source));
+			}), this.setJobs(source, core$23.GetJobs(source) ?? []), this.setGangs(source, core$23.GetGangs(source) ?? []), this.setDuty(source, core$23.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (let source of core$22.GetLoadedSources()) {
-			let character = core$22.GetCharacter(source);
+		for (let source of core$23.GetLoadedSources()) {
+			let character = core$23.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
@@ -383,14 +390,14 @@ var OnlinePlayers = class {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY = new Set(), online = new OnlinePlayers(), core$21 = resourceExport(CORE.resource), vehicleKeys = {
-	give: (source, vehicle, purpose = "temporary") => core$21.GiveVehicleKeys(source, vehicle, purpose),
-	remove: (source, vehicle) => core$21.RemoveVehicleKeys(source, vehicle),
-	has: (source, vehicle) => core$21.HasVehicleKeys(source, vehicle)
-}, core$20 = resourceExport(CORE.resource), fuel = {
-	get: (vehicle) => core$20.GetVehicleFuel(vehicle),
-	set: (vehicle, level) => core$20.SetVehicleFuel(vehicle, level),
-	provider: () => core$20.GetFuelSystem()
+const EMPTY = new Set(), online = new OnlinePlayers(), core$22 = resourceExport(CORE.resource), vehicleKeys = {
+	give: (source, vehicle, purpose = "temporary") => core$22.GiveVehicleKeys(source, vehicle, purpose),
+	remove: (source, vehicle) => core$22.RemoveVehicleKeys(source, vehicle),
+	has: (source, vehicle) => core$22.HasVehicleKeys(source, vehicle)
+}, core$21 = resourceExport(CORE.resource), fuel = {
+	get: (vehicle) => core$21.GetVehicleFuel(vehicle),
+	set: (vehicle, level) => core$21.SetVehicleFuel(vehicle, level),
+	provider: () => core$21.GetFuelSystem()
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -400,14 +407,14 @@ const EMPTY = new Set(), online = new OnlinePlayers(), core$21 = resourceExport(
 	"submarine",
 	"trailer",
 	"train"
-]), types = new Map(), votes = new Map();
+]), types = new Map(), votes = new Map(), modelHash = (model) => typeof model == "number" ? model | 0 : GetHashKey(model) | 0;
 async function vehicleType(model, asker) {
-	let known = types.get(model);
+	let hash = modelHash(model), known = types.get(hash);
 	if (known !== void 0) return known;
 	let answer = await triggerClientCallback(CORE.vehicleTypeCallback, asker, [model]).catch(() => null);
 	if (typeof answer != "string" || !TYPES.has(answer)) return null;
-	let seen = votes.get(model) ?? new Map(), first = seen.get(answer);
-	return first !== void 0 && first !== asker ? (types.set(model, answer), votes.delete(model)) : (seen.set(answer, asker), votes.set(model, seen)), answer;
+	let seen = votes.get(hash) ?? new Map(), first = seen.get(answer);
+	return first !== void 0 && first !== asker ? (types.set(hash, answer), votes.delete(hash)) : (seen.set(answer, asker), votes.set(hash, seen)), answer;
 }
 async function seatPlayer(vehicle, source, seat) {
 	let ped = GetPlayerPed(String(source));
@@ -430,7 +437,7 @@ function randomPlate(prefix) {
 async function spawnVehicle$1(options) {
 	let type = options.asker === void 0 ? options.type ?? "automobile" : await vehicleType(options.model, options.asker);
 	if (!type) return null;
-	let { x, y, z, heading } = options.coords, vehicle = CreateVehicleServerSetter(GetHashKey(options.model), type, x, y, z, heading);
+	let { x, y, z, heading } = options.coords, vehicle = CreateVehicleServerSetter(modelHash(options.model), type, x, y, z, heading);
 	if (!await waitFor(() => DoesEntityExist(vehicle) || void 0, 5e3).catch(() => !1)) return null;
 	options.persistent !== !1 && SetEntityOrphanMode(vehicle, 2);
 	let plate = (options.plate ?? randomPlate()).slice(0, 8);
@@ -503,7 +510,7 @@ on(CORE.playerUnloadedEvent, (source) => {
 	settle && settle(!1);
 });
 // ../../../packages/lib/src/server/definitions.ts
-const core$18 = resourceExport("ai-core");
+const core$19 = resourceExport("ai-core");
 new class {
 	jobs = new Map();
 	gangs = new Map();
@@ -514,11 +521,23 @@ new class {
 	}
 	job(name) {
 		let def = this.jobs.get(name);
-		return def === void 0 && this.jobs.set(name, def = core$18.GetJobDefinition(name) ?? null), def;
+		return def === void 0 && this.jobs.set(name, def = core$19.GetJobDefinition(name) ?? null), def;
+	}
+	registerJob(name, definition) {
+		return core$19.RegisterJobDefinition(name, definition);
+	}
+	removeJob(name) {
+		return core$19.RemoveJobDefinition(name);
+	}
+	registerGang(name, definition) {
+		return core$19.RegisterGangDefinition(name, definition);
+	}
+	removeGang(name) {
+		return core$19.RemoveGangDefinition(name);
 	}
 	gang(name) {
 		let def = this.gangs.get(name);
-		return def === void 0 && this.gangs.set(name, def = core$18.GetGangDefinition(name) ?? null), def;
+		return def === void 0 && this.gangs.set(name, def = core$19.GetGangDefinition(name) ?? null), def;
 	}
 }();
 // ../../../packages/lib/src/server/command.ts
@@ -14932,7 +14951,7 @@ new class {
 		}
 		groups.length = kept, this.nextDue = soonest;
 	};
-}(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
+}(), IsDuplicityVersion(), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource), resourceExport(CORE.resource);
 // ../../../packages/lib/src/server/index.ts
 var WriteQueue = class {
 	onError;
