@@ -5,6 +5,7 @@ import {
 } from "@aicore-fivem/lib/shared";
 import type { KeyPurpose } from "@aicore-fivem/shared";
 import type { OwnedVehicle, Owner, VehicleState } from "common/vehicles";
+import { readAnyProps } from "./qbx/props";
 import { vehicles } from "./store";
 import { world, type SpawnPoint } from "./world";
 
@@ -43,7 +44,7 @@ export function createVehicle(
   state: VehicleState = "garage",
 ): OwnedVehicle {
   const vehicle = vehicles.create(owner, model.toLowerCase(), garage, state);
-  const parsed = toVehicleProps(props);
+  const parsed = readAnyProps(props);
   if (parsed)
     vehicles.update(vehicle.id, { props: { ...parsed, plate: vehicle.plate } });
   return vehicle;
@@ -73,8 +74,7 @@ export function saveVehicle(
 ): void {
   const vehicle = vehicles.get(id);
   if (!vehicle) return;
-  const props =
-    change.props === undefined ? null : toVehicleProps(change.props);
+  const props = change.props === undefined ? null : readAnyProps(change.props);
   const stored = toVehicleProps(vehicle.props);
   const fuel = clamp(change.fuel, 0, 100);
   const engine = clamp(change.engine, -4000, 1000);

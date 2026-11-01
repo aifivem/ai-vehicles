@@ -1,5 +1,5 @@
 import { registerExport } from "@aicore-fivem/lib/server";
-import { isRecord, readFinite } from "@aicore-fivem/lib/shared";
+import { isRecord, readFinite, toVehicleProps } from "@aicore-fivem/lib/shared";
 import { toKeyPurpose } from "@aicore-fivem/shared";
 import type { VehicleState } from "common/vehicles";
 import {
@@ -10,7 +10,18 @@ import {
   storeVehicle,
   toOwner,
 } from "./api";
+import { toFrameworkProps } from "./qbx/props";
 import { vehicles } from "./store";
+import type { OwnedVehicle } from "common/vehicles";
+
+/** `shape` "framework": the props in ox_lib / qb-core's shape and the fuel as `fuelLevel` (scripts written for them). */
+function view(v: OwnedVehicle | null | undefined, shape: unknown) {
+  if (!v) return null;
+  if (shape !== "framework") return v;
+  const parsed = toVehicleProps(v.props);
+  const props = parsed ? toFrameworkProps(parsed) : {};
+  return { ...v, props: { ...props, plate: v.plate, fuelLevel: v.fuel } };
+}
 import { world } from "./world";
 
 const isState = (v: unknown): v is VehicleState =>
@@ -31,27 +42,41 @@ registerExport(
     return { id: v.id, plate: v.plate };
   },
 );
-registerExport("GetVehicle", (ref: unknown) => find(ref) ?? null);
-registerExport("GetVehicles", (owner: unknown) => {
+registerExport("GetVehicle", (ref: unknown, shape?: unknown) =>
+  view(find(ref), shape),
+);
+registerExport("GetVehicles", (owner: unknown, shape?: unknown) => {
   const o = toOwner(owner);
-  return o ? vehicles.ofOwner(o) : [];
+  return o ? vehicles.ofOwner(o).map((v) => view(v, shape)) : [];
 });
 registerExport("GetPlateOwners", () => vehicles.plateOwners());
 /** A vehicle by plate, also of an owner who is not online (from the database); `done(vehicle | null)`. */
-registerExport("FindVehicle", (plate: unknown, done: unknown) => {
-  if (typeof done !== "function") return;
-  const answer = done as (vehicle: unknown) => void;
-  if (typeof plate !== "string") return answer(null);
-  void vehicles.findByPlate(plate).then(answer, () => answer(null));
-});
+registerExport(
+  "FindVehicle",
+  (plate: unknown, done: unknown, shape?: unknown) => {
+    if (typeof done !== "function") return;
+    const answer = done as (vehicle: unknown) => void;
+    if (typeof plate !== "string") return answer(null);
+    void vehicles.findByPlate(plate).then(
+      (v) => answer(view(v, shape)),
+      () => answer(null),
+    );
+  },
+);
 /** An owner's vehicles, also of a character who is not online (from the database); `done(vehicles)`. */
-registerExport("GetVehiclesOf", (owner: unknown, done: unknown) => {
-  if (typeof done !== "function") return;
-  const answer = done as (list: unknown) => void;
-  const o = toOwner(owner);
-  if (!o) return answer([]);
-  void vehicles.ofOwnerAnywhere(o).then(answer, () => answer([]));
-});
+registerExport(
+  "GetVehiclesOf",
+  (owner: unknown, done: unknown, shape?: unknown) => {
+    if (typeof done !== "function") return;
+    const answer = done as (list: unknown) => void;
+    const o = toOwner(owner);
+    if (!o) return answer([]);
+    void vehicles.ofOwnerAnywhere(o).then(
+      (list) => answer(list.map((v) => view(v, shape))),
+      () => answer([]),
+    );
+  },
+);
 /** Another plate for a vehicle (custom plate, plate changer; the entity in the world too); `done(ok)`. */
 registerExport("SetPlate", (id: unknown, plate: unknown, done?: unknown) => {
   const answer =

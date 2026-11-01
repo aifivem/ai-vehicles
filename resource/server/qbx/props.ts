@@ -90,7 +90,9 @@ function readExtras(v: unknown): Record<number, boolean> {
 }
 
 /** Props in ox_lib / qb-core's shape turned into the lib's VehicleProps; null when it is not that shape. */
-function fromFrameworkProps(v: Record<string, unknown>): VehicleProps | null {
+export function fromFrameworkProps(
+  v: Record<string, unknown>,
+): VehicleProps | null {
   const model = int(v.model, -2147483648, 4294967295);
   if (model === null) return null;
   const mods: Record<number, number> = {};
@@ -143,4 +145,44 @@ export function readQbxProps(
   if (!isRecord(value)) return null;
   const props = toVehicleProps(value) ?? fromFrameworkProps(value);
   return props && props.model === entityModel ? props : null;
+}
+
+/** The lib's VehicleProps or ox_lib / qb-core's shape as VehicleProps; null when neither. */
+export function readAnyProps(value: unknown): VehicleProps | null {
+  if (!isRecord(value)) return null;
+  return toVehicleProps(value) ?? fromFrameworkProps(value);
+}
+
+/**
+ * The lib's VehicleProps in ox_lib / qb-core's shape (`modEngine`, `color1`, extras 0 = on): for scripts that apply
+ * looks with `lib.setVehicleProperties` or a framework's SetVehicleProperties.
+ */
+export function toFrameworkProps(p: VehicleProps): Record<string, unknown> {
+  const extras: Record<string, number> = {};
+  for (const [id, on] of Object.entries(p.extras)) extras[id] = on ? 0 : 1;
+  const out: Record<string, unknown> = {
+    model: p.model,
+    plate: p.plate,
+    plateIndex: p.plateIndex,
+    color1: p.customPrimary ?? p.colors[0],
+    color2: p.customSecondary ?? p.colors[1],
+    pearlescentColor: p.extraColors[0],
+    wheelColor: p.extraColors[1],
+    wheels: p.wheelType,
+    windowTint: p.windowTint,
+    livery: p.livery,
+    xenonColor: p.xenonColor,
+    neonEnabled: [...p.neon],
+    neonColor: [...p.neonColor],
+    tyreSmokeColor: [...p.tyreSmoke],
+    extras,
+    dirtLevel: p.dirt,
+    engineHealth: p.engineHealth,
+    bodyHealth: p.bodyHealth,
+  };
+  MOD_NAMES.forEach((name, type) => {
+    const x = p.mods[type];
+    if (x !== undefined) out[name] = TOGGLE_MODS.has(type) ? x === 1 : x;
+  });
+  return out;
 }

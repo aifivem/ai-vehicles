@@ -14980,6 +14980,114 @@ var WriteQueue = class {
 		return this.tail;
 	}
 };
+// resource/server/qbx/props.ts
+const MOD_NAMES = "modSpoilers.modFrontBumper.modRearBumper.modSideSkirt.modExhaust.modFrame.modGrille.modHood.modFender.modRightFender.modRoof.modEngine.modBrakes.modTransmission.modHorns.modSuspension.modArmor.modNitrous.modTurbo.modSubwoofer.modSmokeEnabled.modHydraulics.modXenon.modFrontWheels.modBackWheels.modPlateHolder.modVanityPlate.modTrimA.modOrnaments.modDashboard.modDial.modDoorSpeaker.modSeats.modSteeringWheel.modShifterLeavers.modAPlate.modSpeakers.modTrunk.modHydrolic.modEngineBlock.modAirFilter.modStruts.modArchCover.modAerials.modTrimB.modTank.modWindows.modDoorR.modLivery.modLightbar".split("."), TOGGLE_MODS = new Set([
+	17,
+	18,
+	19,
+	20,
+	21,
+	22
+]), int = (v, min, max) => typeof v == "number" && Number.isInteger(v) && v >= min && v <= max ? v : null, finite = (v, fallback) => typeof v == "number" && Number.isFinite(v) ? v : fallback, rgb = (v) => {
+	if (!Array.isArray(v) || v.length !== 3) return null;
+	let [r, g, b] = v.map((x) => int(x, 0, 255));
+	return r != null && g != null && b != null ? [
+		r,
+		g,
+		b
+	] : null;
+};
+function readExtras(v) {
+	let extras = {}, entries = Array.isArray(v) ? v.map((x, i) => [i + 1, x]) : isRecord(v) ? Object.entries(v).map(([k, x]) => [Number(k), x]) : [];
+	for (let [id, x] of entries) int(id, 0, 20) !== null && (typeof x == "boolean" ? extras[id] = x : (x === 0 || x === 1) && (extras[id] = x === 0));
+	return extras;
+}
+function fromFrameworkProps(v) {
+	let model = int(v.model, -2147483648, 4294967295);
+	if (model === null) return null;
+	let mods = {};
+	MOD_NAMES.forEach((name, type) => {
+		let x = v[name];
+		if (TOGGLE_MODS.has(type)) {
+			typeof x == "boolean" ? mods[type] = +!!x : (x === 0 || x === 1) && (mods[type] = x);
+			return;
+		}
+		let index = int(x, -1, 255);
+		index !== null && (mods[type] = index);
+	});
+	let color = (x) => int(x, 0, 255), neon = Array.isArray(v.neonEnabled) ? v.neonEnabled : [];
+	return {
+		v: 1,
+		model: model > 2147483647 ? model - 4294967296 : model,
+		plate: typeof v.plate == "string" ? v.plate.trim().slice(0, 8) : "",
+		plateIndex: int(v.plateIndex, 0, 12) ?? 0,
+		colors: [color(v.color1) ?? 0, color(v.color2) ?? 0],
+		extraColors: [color(v.pearlescentColor) ?? 0, color(v.wheelColor) ?? 0],
+		customPrimary: rgb(v.color1),
+		customSecondary: rgb(v.color2),
+		wheelType: int(v.wheels, -1, 12) ?? 0,
+		windowTint: int(v.windowTint, -1, 6) ?? -1,
+		livery: int(v.livery, -1, 255) ?? -1,
+		mods,
+		xenonColor: int(v.xenonColor, -1, 255) ?? 255,
+		neon: [
+			0,
+			1,
+			2,
+			3
+		].map((i) => neon[i] === !0),
+		neonColor: rgb(v.neonColor) ?? [
+			255,
+			0,
+			255
+		],
+		tyreSmoke: rgb(v.tyreSmokeColor) ?? [
+			255,
+			255,
+			255
+		],
+		extras: readExtras(v.extras),
+		dirt: Math.min(15, Math.max(0, finite(v.dirtLevel, 0))),
+		engineHealth: Math.min(1e3, Math.max(-4e3, finite(v.engineHealth, 1e3))),
+		bodyHealth: Math.min(1e3, Math.max(0, finite(v.bodyHealth, 1e3)))
+	};
+}
+function readQbxProps(value, entityModel) {
+	if (!isRecord(value)) return null;
+	let props = toVehicleProps(value) ?? fromFrameworkProps(value);
+	return props && props.model === entityModel ? props : null;
+}
+function readAnyProps(value) {
+	return isRecord(value) ? toVehicleProps(value) ?? fromFrameworkProps(value) : null;
+}
+function toFrameworkProps(p) {
+	let extras = {};
+	for (let [id, on] of Object.entries(p.extras)) extras[id] = +!on;
+	let out = {
+		model: p.model,
+		plate: p.plate,
+		plateIndex: p.plateIndex,
+		color1: p.customPrimary ?? p.colors[0],
+		color2: p.customSecondary ?? p.colors[1],
+		pearlescentColor: p.extraColors[0],
+		wheelColor: p.extraColors[1],
+		wheels: p.wheelType,
+		windowTint: p.windowTint,
+		livery: p.livery,
+		xenonColor: p.xenonColor,
+		neonEnabled: [...p.neon],
+		neonColor: [...p.neonColor],
+		tyreSmokeColor: [...p.tyreSmoke],
+		extras,
+		dirtLevel: p.dirt,
+		engineHealth: p.engineHealth,
+		bodyHealth: p.bodyHealth
+	};
+	return MOD_NAMES.forEach((name, type) => {
+		let x = p.mods[type];
+		x !== void 0 && (out[name] = TOGGLE_MODS.has(type) ? x === 1 : x);
+	}), out;
+}
 // resource/common/vehicles.ts
 const plateFromId = (id) => `AI${id.toString(36).toUpperCase().padStart(6, "0")}`.slice(-8);
 createLocale();
@@ -15233,7 +15341,7 @@ function find(ref) {
 	if (typeof ref == "string") return vehicles.byPlateText(ref);
 }
 function createVehicle(owner, model, garage, props, state = "garage") {
-	let vehicle = vehicles.create(owner, model.toLowerCase(), garage, state), parsed = toVehicleProps(props);
+	let vehicle = vehicles.create(owner, model.toLowerCase(), garage, state), parsed = readAnyProps(props);
 	return parsed && vehicles.update(vehicle.id, { props: {
 		...parsed,
 		plate: vehicle.plate
@@ -15243,7 +15351,7 @@ const clamp = (v, min, max) => typeof v == "number" && Number.isFinite(v) ? Math
 function saveVehicle(id, change, tuning = !1) {
 	let vehicle = vehicles.get(id);
 	if (!vehicle) return;
-	let props = change.props === void 0 ? null : toVehicleProps(change.props), stored = toVehicleProps(vehicle.props), fuel = clamp(change.fuel, 0, 100), engine = clamp(change.engine, -4e3, 1e3), body = clamp(change.body, 0, 1e3);
+	let props = change.props === void 0 ? null : readAnyProps(change.props), stored = toVehicleProps(vehicle.props), fuel = clamp(change.fuel, 0, 100), engine = clamp(change.engine, -4e3, 1e3), body = clamp(change.body, 0, 1e3);
 	vehicles.update(id, {
 		...props ? {
 			props: {
@@ -15279,6 +15387,19 @@ function storeVehicle(id, garage, state = "garage") {
 	});
 }
 // resource/server/exports.ts
+function view(v, shape) {
+	if (!v) return null;
+	if (shape !== "framework") return v;
+	let parsed = toVehicleProps(v.props), props = parsed ? toFrameworkProps(parsed) : {};
+	return {
+		...v,
+		props: {
+			...props,
+			plate: v.plate,
+			fuelLevel: v.fuel
+		}
+	};
+}
 const isState = (v) => v === "garage" || v === "out" || v === "impound";
 registerExport("CreateVehicle", (owner, model, garage, props) => {
 	let o = toOwner(owner);
@@ -15288,19 +15409,19 @@ registerExport("CreateVehicle", (owner, model, garage, props) => {
 		id: v.id,
 		plate: v.plate
 	};
-}), registerExport("GetVehicle", (ref) => find(ref) ?? null), registerExport("GetVehicles", (owner) => {
+}), registerExport("GetVehicle", (ref, shape) => view(find(ref), shape)), registerExport("GetVehicles", (owner, shape) => {
 	let o = toOwner(owner);
-	return o ? vehicles.ofOwner(o) : [];
-}), registerExport("GetPlateOwners", () => vehicles.plateOwners()), registerExport("FindVehicle", (plate, done) => {
+	return o ? vehicles.ofOwner(o).map((v) => view(v, shape)) : [];
+}), registerExport("GetPlateOwners", () => vehicles.plateOwners()), registerExport("FindVehicle", (plate, done, shape) => {
 	if (typeof done != "function") return;
 	let answer = done;
 	if (typeof plate != "string") return answer(null);
-	vehicles.findByPlate(plate).then(answer, () => answer(null));
-}), registerExport("GetVehiclesOf", (owner, done) => {
+	vehicles.findByPlate(plate).then((v) => answer(view(v, shape)), () => answer(null));
+}), registerExport("GetVehiclesOf", (owner, done, shape) => {
 	if (typeof done != "function") return;
 	let answer = done, o = toOwner(owner);
 	if (!o) return answer([]);
-	vehicles.ofOwnerAnywhere(o).then(answer, () => answer([]));
+	vehicles.ofOwnerAnywhere(o).then((list) => answer(list.map((v) => view(v, shape))), () => answer([]));
 }), registerExport("SetPlate", (id, plate, done) => {
 	let answer = typeof done == "function" ? done : () => {};
 	if (typeof id != "number" || typeof plate != "string") return answer(!1);
@@ -15339,83 +15460,6 @@ registerExport("CreateVehicle", (owner, model, garage, props) => {
 		typeof cb == "function" && cb(netId);
 	});
 });
-// resource/server/qbx/props.ts
-const MOD_NAMES = "modSpoilers.modFrontBumper.modRearBumper.modSideSkirt.modExhaust.modFrame.modGrille.modHood.modFender.modRightFender.modRoof.modEngine.modBrakes.modTransmission.modHorns.modSuspension.modArmor.modNitrous.modTurbo.modSubwoofer.modSmokeEnabled.modHydraulics.modXenon.modFrontWheels.modBackWheels.modPlateHolder.modVanityPlate.modTrimA.modOrnaments.modDashboard.modDial.modDoorSpeaker.modSeats.modSteeringWheel.modShifterLeavers.modAPlate.modSpeakers.modTrunk.modHydrolic.modEngineBlock.modAirFilter.modStruts.modArchCover.modAerials.modTrimB.modTank.modWindows.modDoorR.modLivery.modLightbar".split("."), TOGGLE_MODS = new Set([
-	17,
-	18,
-	19,
-	20,
-	21,
-	22
-]), int = (v, min, max) => typeof v == "number" && Number.isInteger(v) && v >= min && v <= max ? v : null, finite = (v, fallback) => typeof v == "number" && Number.isFinite(v) ? v : fallback, rgb = (v) => {
-	if (!Array.isArray(v) || v.length !== 3) return null;
-	let [r, g, b] = v.map((x) => int(x, 0, 255));
-	return r != null && g != null && b != null ? [
-		r,
-		g,
-		b
-	] : null;
-};
-function readExtras(v) {
-	let extras = {}, entries = Array.isArray(v) ? v.map((x, i) => [i + 1, x]) : isRecord(v) ? Object.entries(v).map(([k, x]) => [Number(k), x]) : [];
-	for (let [id, x] of entries) int(id, 0, 20) !== null && (typeof x == "boolean" ? extras[id] = x : (x === 0 || x === 1) && (extras[id] = x === 0));
-	return extras;
-}
-function fromFrameworkProps(v) {
-	let model = int(v.model, -2147483648, 4294967295);
-	if (model === null) return null;
-	let mods = {};
-	MOD_NAMES.forEach((name, type) => {
-		let x = v[name];
-		if (TOGGLE_MODS.has(type)) {
-			typeof x == "boolean" ? mods[type] = +!!x : (x === 0 || x === 1) && (mods[type] = x);
-			return;
-		}
-		let index = int(x, -1, 255);
-		index !== null && (mods[type] = index);
-	});
-	let color = (x) => int(x, 0, 255), neon = Array.isArray(v.neonEnabled) ? v.neonEnabled : [];
-	return {
-		v: 1,
-		model: model > 2147483647 ? model - 4294967296 : model,
-		plate: typeof v.plate == "string" ? v.plate.trim().slice(0, 8) : "",
-		plateIndex: int(v.plateIndex, 0, 12) ?? 0,
-		colors: [color(v.color1) ?? 0, color(v.color2) ?? 0],
-		extraColors: [color(v.pearlescentColor) ?? 0, color(v.wheelColor) ?? 0],
-		customPrimary: rgb(v.color1),
-		customSecondary: rgb(v.color2),
-		wheelType: int(v.wheels, -1, 12) ?? 0,
-		windowTint: int(v.windowTint, -1, 6) ?? -1,
-		livery: int(v.livery, -1, 255) ?? -1,
-		mods,
-		xenonColor: int(v.xenonColor, -1, 255) ?? 255,
-		neon: [
-			0,
-			1,
-			2,
-			3
-		].map((i) => neon[i] === !0),
-		neonColor: rgb(v.neonColor) ?? [
-			255,
-			0,
-			255
-		],
-		tyreSmoke: rgb(v.tyreSmokeColor) ?? [
-			255,
-			255,
-			255
-		],
-		extras: readExtras(v.extras),
-		dirt: Math.min(15, Math.max(0, finite(v.dirtLevel, 0))),
-		engineHealth: Math.min(1e3, Math.max(-4e3, finite(v.engineHealth, 1e3))),
-		bodyHealth: Math.min(1e3, Math.max(0, finite(v.bodyHealth, 1e3)))
-	};
-}
-function readQbxProps(value, entityModel) {
-	if (!isRecord(value)) return null;
-	let props = toVehicleProps(value) ?? fromFrameworkProps(value);
-	return props && props.model === entityModel ? props : null;
-}
 // resource/server/qbx/index.ts
 const core = resourceExport("ai-core");
 function qbxView(v) {
