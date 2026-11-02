@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.2](https://github.com/aifivem/ai-vehicles/compare/v0.2.1...v0.2.2) (2026-11-02)
+
+
+### Documentation
+
+* install from the release zip ([e37019c](https://github.com/aifivem/ai-vehicles/commit/e37019cf3605d36ba0cb0b8de68274b4e4215e53))
+
+
+### Miscellaneous Chores
+
+* build files are no longer in git, the release zip carries them ([27c477a](https://github.com/aifivem/ai-vehicles/commit/27c477aca19841ae5605ccdc6da584da92cf87da))
+
 ## [0.2.1](https://github.com/aifivem/ai-vehicles/compare/v0.2.0...v0.2.1) (2026-11-02)
 
 
