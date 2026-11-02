@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0](https://github.com/aifivem/ai-vehicles/compare/v0.2.2...v0.3.0) (2026-11-02)
+
+
+### New Features
+
+* **vehicles:** adopt a world vehicle as an owned vehicle with its plate and look ([e96e5ec](https://github.com/aifivem/ai-vehicles/commit/e96e5ecad0ff95846bb2b6df2a8b8b05c51b16c0))
+* **vehicles:** remove left vehicles and delete owned vehicles by plate ([fd23938](https://github.com/aifivem/ai-vehicles/commit/fd23938a402cb4c5c15eab2599251cd726c5b376))
+
+
+### Bug Fixes
+
+* **vehicles:** set a custom plate on the game thread ([8e1c219](https://github.com/aifivem/ai-vehicles/commit/8e1c219259e8263c4f2b1a521fe13530e94f9fb0))
+
+
+### Miscellaneous Chores
+
+* **data:** write the new settings defaults and panel schemas ([db5668d](https://github.com/aifivem/ai-vehicles/commit/db5668d185135598843d80b4ff9817254803cd66))
+
 ## [0.2.2](https://github.com/aifivem/ai-vehicles/compare/v0.2.1...v0.2.2) (2026-11-02)
 
 
