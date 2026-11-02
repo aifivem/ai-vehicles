@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/aifivem/ai-vehicles/compare/v0.2.0...v0.2.1) (2026-11-02)
+
+
+### Code Refactoring
+
+* import the shared packages from [@aifivem](https://github.com/aifivem) ([ac7b04e](https://github.com/aifivem/ai-vehicles/commit/ac7b04e1a256281345284f2c2a68b8752b70e961))
+
 ## [0.2.0](https://github.com/aifivem/ai-vehicles/compare/v0.1.3...v0.2.0) (2026-11-01)
 
 
