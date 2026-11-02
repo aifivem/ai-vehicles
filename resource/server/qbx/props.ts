@@ -2,7 +2,7 @@ import {
   isRecord,
   toVehicleProps,
   type VehicleProps,
-} from "@aicore-fivem/lib/shared";
+} from "@aifivem/lib/shared";
 
 /** ox_lib / qb-core property names of mod types 0-49 (`modEngine` = 11, ...). */
 const MOD_NAMES = [

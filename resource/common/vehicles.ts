@@ -5,8 +5,8 @@ export type {
   VehicleOwner as Owner,
   VehicleOwnerType as OwnerType,
   VehicleState,
-} from "@aicore-fivem/shared";
-export { VEHICLE_BAGS as BAGS } from "@aicore-fivem/shared";
+} from "@aifivem/shared";
+export { VEHICLE_BAGS as BAGS } from "@aifivem/shared";
 
 /** Plates come from the id (base 36, eight characters), so two vehicles never share one. */
 export const plateFromId = (id: number): string =>
@@ -17,6 +17,6 @@ export const plateFromId = (id: number): string =>
  * memory or changed owner, and plates that left it (one batch per tick). With the `GetPlateOwners` export (the same
  * triples, once at start) another resource mirrors plate -> owner without an export call per check.
  */
-export { VEHICLES_EVENTS } from "@aicore-fivem/shared";
+export { VEHICLES_EVENTS } from "@aifivem/shared";
 
 export type PlateOwner = [plate: string, type: string, id: string];

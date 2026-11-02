@@ -1,5 +1,5 @@
-import { mysql } from "@aicore-fivem/mysql";
-import { toVehicleProps, toVehicleSetup } from "@aicore-fivem/lib/shared";
+import { mysql } from "@aifivem/mysql";
+import { toVehicleProps, toVehicleSetup } from "@aifivem/lib/shared";
 import type {
   OwnedVehicle,
   Owner,

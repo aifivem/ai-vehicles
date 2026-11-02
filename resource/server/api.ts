@@ -2,8 +2,8 @@ import {
   isRecord,
   toVehicleProps,
   toVehicleSetup,
-} from "@aicore-fivem/lib/shared";
-import type { KeyPurpose } from "@aicore-fivem/shared";
+} from "@aifivem/lib/shared";
+import type { KeyPurpose } from "@aifivem/shared";
 import type { OwnedVehicle, Owner, VehicleState } from "common/vehicles";
 import { readAnyProps } from "./qbx/props";
 import { vehicles } from "./store";

@@ -1,5 +1,5 @@
-import { WriteQueue } from "@aicore-fivem/lib/server";
-import { normalizePlate } from "@aicore-fivem/lib/shared";
+import { WriteQueue } from "@aifivem/lib/server";
+import { normalizePlate } from "@aifivem/lib/shared";
 import {
   plateFromId,
   type OwnedVehicle,

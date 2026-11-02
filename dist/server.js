@@ -279,7 +279,9 @@ var OnlineMirror = class {
 	jobIndex = new Map();
 	gangIndex = new Map();
 	byCitizenid = new Map();
+	jobListeners = new Set();
 	started = !1;
+	loading = !1;
 	start() {
 		if (this.started) return;
 		this.started = !0;
@@ -291,7 +293,9 @@ var OnlineMirror = class {
 				gangs: [],
 				gangNames: [],
 				duty: null
-			}), this.byCitizenid.set(character.citizenid, source), this.setJobs(source, core$24.GetJobs(source) ?? []), this.setGangs(source, core$24.GetGangs(source) ?? []), this.setDuty(source, core$24.GetDutyJob(source));
+			}), this.byCitizenid.set(character.citizenid, source), this.loading = !0, this.setJobs(source, core$24.GetJobs(source) ?? []), this.setGangs(source, core$24.GetGangs(source) ?? []), this.setDuty(source, core$24.GetDutyJob(source)), this.loading = !1;
+			let player = this.players.get(source);
+			player && this.emitJobs(source, player, [], null, !0);
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
 		for (let source of core$24.GetLoadedSources()) {
@@ -299,15 +303,34 @@ var OnlineMirror = class {
 			character && load(source, character);
 		}
 	}
+	emitJobs(source, player, jobs, duty, online) {
+		if (this.jobListeners.size === 0) return;
+		let change = {
+			source,
+			citizenid: player.character.citizenid,
+			jobs: online ? player.jobs : [],
+			duty: online ? player.duty : null,
+			online,
+			previous: {
+				jobs,
+				duty
+			}
+		};
+		for (let listener of this.jobListeners) listener(change);
+	}
 	drop(source) {
 		let player = this.players.get(source);
-		player && (this.setDuty(source, null), reindex(this.jobIndex, source, player.jobNames, []), reindex(this.gangIndex, source, player.gangNames, []), this.byCitizenid.delete(player.character.citizenid), this.players.delete(source));
+		if (!player) return;
+		let [jobs, duty] = [player.jobs, player.duty];
+		this.loading = !0, this.setDuty(source, null), this.loading = !1, this.emitJobs(source, player, jobs, duty, !1), reindex(this.jobIndex, source, player.jobNames, []), reindex(this.gangIndex, source, player.gangNames, []), this.byCitizenid.delete(player.character.citizenid), this.players.delete(source);
 	}
 	setJobs(source, jobs) {
 		let player = this.players.get(source);
 		if (!player) return;
 		let names = jobs.map((m) => m.job);
-		reindex(this.jobIndex, source, player.jobNames, names), player.jobs = jobs, player.jobNames = names;
+		reindex(this.jobIndex, source, player.jobNames, names);
+		let before = player.jobs;
+		player.jobs = jobs, player.jobNames = names, this.loading || this.emitJobs(source, player, before, player.duty, !0);
 	}
 	setGangs(source, gangs) {
 		let player = this.players.get(source);
@@ -317,14 +340,17 @@ var OnlineMirror = class {
 	}
 	setDuty(source, job) {
 		let player = this.players.get(source);
-		if (!player) return;
+		if (!player || player.duty === job) return;
+		let before = player.duty;
 		if (player.duty) {
 			let set = this.onDuty.get(player.duty);
 			set?.delete(source), set?.size === 0 && this.onDuty.delete(player.duty);
 		}
-		if (player.duty = job, !job) return;
-		let set = this.onDuty.get(job);
-		set || this.onDuty.set(job, set = new Set()), set.add(source);
+		if (player.duty = job, job) {
+			let set = this.onDuty.get(job);
+			set || this.onDuty.set(job, set = new Set()), set.add(source);
+		}
+		this.loading || this.emitJobs(source, player, player.jobs, before, !0);
 	}
 }, OnlinePlayers = class extends OnlineMirror {
 	sources() {
@@ -396,6 +422,32 @@ var OnlineMirror = class {
 		let count = 0;
 		for (let job of jobs) count += this.onDuty.get(job)?.size ?? 0;
 		return count;
+	}
+	countMembers(jobs, onlyOnDuty = !1) {
+		if (onlyOnDuty) return this.countOnDuty(jobs);
+		this.start();
+		let count = 0;
+		for (let i = 0; i < jobs.length; i++) {
+			let set = this.jobIndex.get(jobs[i]);
+			if (set && (count += set.size, i !== 0)) {
+				for (let source of set) for (let k = 0; k < i; k++) if (this.jobIndex.get(jobs[k])?.has(source)) {
+					count--;
+					break;
+				}
+			}
+		}
+		return count;
+	}
+	membersOf(jobs, onlyOnDuty = !1) {
+		this.start();
+		let index = onlyOnDuty ? this.onDuty : this.jobIndex;
+		if (jobs.length === 1) return [...index.get(jobs[0]) ?? EMPTY];
+		let seen = new Set();
+		for (let job of jobs) for (let source of index.get(job) ?? EMPTY) seen.add(source);
+		return [...seen];
+	}
+	onJobState(listener) {
+		return this.start(), this.jobListeners.add(listener), () => this.jobListeners.delete(listener);
 	}
 	onDutyFor(job) {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;

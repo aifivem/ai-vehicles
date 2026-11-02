@@ -1,4 +1,4 @@
-import { createDatabaseTables, onCharacter } from "@aicore-fivem/lib/server";
+import { createDatabaseTables, onCharacter } from "@aifivem/lib/server";
 import { ResourceName } from "common";
 import { log } from "./log";
 import { vehicles } from "./store";

@@ -6,7 +6,7 @@
 -- Owned vehicles. `id` is assigned by the server (memory first); the plate is derived from it, so it is unique.
 -- owner_type: character (owner_id = ai_core_characters.id), job or gang (owner_id = its name), resource (held by a
 -- script, owner_id = the resource: a used car lot listing).
--- state: garage (in `garage`), out (in the world), impound. props: VehicleProps JSON (@aicore-fivem/lib).
+-- state: garage (in `garage`), out (in the world), impound. props: VehicleProps JSON (@aifivem/lib).
 -- setup: VehicleSetup JSON a vehicle spawns with until its first props save (a shop's colour).
 CREATE TABLE IF NOT EXISTS `ai_vehicles_owned` (
   `id` BIGINT UNSIGNED NOT NULL,

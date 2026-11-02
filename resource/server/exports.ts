@@ -1,6 +1,6 @@
-import { registerExport } from "@aicore-fivem/lib/server";
-import { isRecord, readFinite, toVehicleProps } from "@aicore-fivem/lib/shared";
-import { toKeyPurpose } from "@aicore-fivem/shared";
+import { registerExport } from "@aifivem/lib/server";
+import { isRecord, readFinite, toVehicleProps } from "@aifivem/lib/shared";
+import { toKeyPurpose } from "@aifivem/shared";
 import type { VehicleState } from "common/vehicles";
 import {
   createVehicle,

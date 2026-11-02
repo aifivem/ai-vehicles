@@ -1,6 +1,6 @@
 # ai-vehicles
 
-Owned vehicles: storage, ownership (characters, jobs, gangs), spawning on the server and the look (props, applied by ai-core on the entity's owner client). The API garages, shops, keys and fuel build on; stands in for `qbx_vehicles`. Depends on ai-core and its table through `@aicore-fivem/mysql`.
+Owned vehicles: storage, ownership (characters, jobs, gangs), spawning on the server and the look (props, applied by ai-core on the entity's owner client). The API garages, shops, keys and fuel build on; stands in for `qbx_vehicles`. Depends on ai-core and its table through `@aifivem/mysql`.
 
 ## Decisions
 
@@ -13,9 +13,9 @@ Owned vehicles: storage, ownership (characters, jobs, gangs), spawning on the se
 
 ## Contracts
 
-- Types and export signatures: `@aicore-fivem/shared` `vehicles.ts` (`AiVehiclesServerExports`, `VEHICLE_BAGS`).
+- Types and export signatures: `@aifivem/shared` `vehicles.ts` (`AiVehiclesServerExports`, `VEHICLE_BAGS`).
 - qbx_vehicles exports: `server/qbx/index.ts` (citizenid filters need the owner online).
-- Plate -> owner mirror for other resources (ai-vehiclekeys): export `GetPlateOwners()` -> `[plate, ownerType, ownerId][]` (every vehicle in memory, read once at the consumer's start) and the local server event `ai-vehicles:owners (puts, removes)` (`OWNERS_EVENT` in `resource/common/vehicles.ts`): vehicles that entered memory or changed owner as the same triples, plates that left memory; one batch per tick (`server/ownerFeed.ts`, fed by the store's add / forget). Neither is in `@aicore-fivem/shared` yet.
+- Plate -> owner mirror for other resources (ai-vehiclekeys): export `GetPlateOwners()` -> `[plate, ownerType, ownerId][]` (every vehicle in memory, read once at the consumer's start) and the local server event `ai-vehicles:owners (puts, removes)` (`OWNERS_EVENT` in `resource/common/vehicles.ts`): vehicles that entered memory or changed owner as the same triples, plates that left memory; one batch per tick (`server/ownerFeed.ts`, fed by the store's add / forget). Neither is in `@aifivem/shared` yet.
 - Props come in as the lib's VehicleProps or ox_lib / qb-core's shape (`CreateVehicle`, `SaveVehicle`, `SaveTuning`: `readAnyProps`); `GetVehicle` / `GetVehicles` / `FindVehicle` / `GetVehiclesOf` with `shape` "framework" hand them back in that shape (`toFrameworkProps`, `qbx/props.ts`) with `fuelLevel`, for scripts that spawn and dress vehicles themselves (TGIANN scripts).
 - Owners who are not online: `FindVehicle(plate, done)` and `GetVehiclesOf(owner, done)` read the table (memory first, rows not loaded). `SetPlate(id, plate, done)`: a custom plate (1-8 letters / digits) for a vehicle in memory, checked against memory and the table; generated `AI...` plates are reserved, so the two never collide.
 - Table `ai_vehicles_owned` (`sql/main.sql`).

@@ -1,6 +1,6 @@
-import { spawnVehicle } from "@aicore-fivem/lib/server";
-import { toVehicleSetup } from "@aicore-fivem/lib/shared";
-import type { KeyPurpose } from "@aicore-fivem/shared";
+import { spawnVehicle } from "@aifivem/lib/server";
+import { toVehicleSetup } from "@aifivem/lib/shared";
+import type { KeyPurpose } from "@aifivem/shared";
 import { BAGS } from "common/vehicles";
 import { log } from "./log";
 import { vehicles } from "./store";
