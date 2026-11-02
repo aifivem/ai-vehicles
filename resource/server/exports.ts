@@ -1,15 +1,18 @@
 import { registerExport } from "@aifivem/lib/server";
 import { isRecord, readFinite, toVehicleProps } from "@aifivem/lib/shared";
 import { toKeyPurpose } from "@aifivem/shared";
-import type { VehicleState } from "common/vehicles";
+import type { DeleteByPlateResult, VehicleState } from "common/vehicles";
 import {
   createVehicle,
+  deleteVehicle,
   find,
   saveVehicle,
   spawnVehicle,
   storeVehicle,
   toOwner,
 } from "./api";
+import { deleteByPlate } from "./deleteByPlate";
+import { log } from "./log";
 import { toFrameworkProps } from "./qbx/props";
 import { vehicles } from "./store";
 import type { OwnedVehicle } from "common/vehicles";
@@ -83,11 +86,13 @@ registerExport("SetPlate", (id: unknown, plate: unknown, done?: unknown) => {
     typeof done === "function" ? (done as (ok: boolean) => void) : () => {};
   if (typeof id !== "number" || typeof plate !== "string") return answer(false);
   void vehicles.setPlate(id, plate).then(
-    (ok) => {
-      const entity = ok ? world.entityOf(id) : undefined;
-      if (entity) SetVehicleNumberPlateText(entity, plate);
-      answer(ok);
-    },
+    // The query resolves on Node's thread: back to the game thread before the natives.
+    (ok) =>
+      setImmediate(() => {
+        const entity = ok ? world.entityOf(id) : undefined;
+        if (entity) SetVehicleNumberPlateText(entity, plate);
+        answer(ok);
+      }),
     () => answer(false),
   );
 });
@@ -129,9 +134,7 @@ registerExport("SetOwner", (id: unknown, owner: unknown) => {
   if (typeof id === "number" && o) vehicles.setOwner(id, o);
 });
 registerExport("DeleteVehicle", (id: unknown) => {
-  if (typeof id !== "number") return;
-  world.despawn(id);
-  vehicles.remove(id);
+  if (typeof id === "number") deleteVehicle(id);
 });
 registerExport(
   "SpawnVehicle",
@@ -165,3 +168,17 @@ registerExport(
     });
   },
 );
+/**
+ * Deletes an owned vehicle completely by plate (row and every world entity with the plate), also of an owner who is
+ * not online; `done({ ok: true, id, entities } | { ok: false, error: "invalid_plate" | "not_found" | "failed" })`.
+ */
+registerExport("DeleteVehicleByPlate", (plate: unknown, done?: unknown) => {
+  const answer =
+    typeof done === "function"
+      ? (done as (result: DeleteByPlateResult) => void)
+      : () => {};
+  deleteByPlate(plate).then(answer, (error: unknown) => {
+    log.error(`deleting plate ${String(plate)} failed`, error);
+    answer({ ok: false, error: "failed" });
+  });
+});
