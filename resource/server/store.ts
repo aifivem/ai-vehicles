@@ -1,6 +1,7 @@
 import { WriteQueue } from "@aifivem/lib/server";
 import { normalizePlate } from "@aifivem/lib/shared";
 import {
+  isCustomPlate,
   plateFromId,
   type OwnedVehicle,
   type Owner,
@@ -21,11 +22,6 @@ import {
   updatePlate,
   updateVehicle,
 } from "./repo";
-
-/** Generated plates (`plateFromId`) start with this: a custom plate never does, so the two never collide. */
-const GENERATED = /^AI[0-9A-Z]+$/;
-/** What a custom plate may be: GTA's 8 characters, letters, digits and inner spaces. */
-const PLATE = /^[A-Z0-9](?:[A-Z0-9 ]{0,6}[A-Z0-9])?$/;
 
 const ownerKey = (owner: Owner): string => `${owner.type}:${owner.id}`;
 /**
@@ -129,7 +125,7 @@ class VehicleStore {
   async setPlate(id: number, plate: string): Promise<boolean> {
     const next = normalizePlate(plate);
     const vehicle = this.byId.get(id);
-    if (!vehicle || !PLATE.test(next) || GENERATED.test(next)) return false;
+    if (!vehicle || !isCustomPlate(next)) return false;
     if (next === vehicle.plate) return true;
     if (this.byPlate.has(next) || (await plateRow(next))) return false;
     // another change may have taken it meanwhile
@@ -154,11 +150,13 @@ class VehicleStore {
     model: string,
     garage: string | null,
     state: VehicleState = "garage",
+    /** A free custom plate (`isCustomPlate`, checked by the caller); else the generated one. */
+    plate?: string,
   ): OwnedVehicle {
     const id = this.nextId++;
     const vehicle: OwnedVehicle = {
       id,
-      plate: plateFromId(id),
+      plate: plate ?? plateFromId(id),
       owner,
       model,
       props: null,

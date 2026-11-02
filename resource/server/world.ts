@@ -1,5 +1,12 @@
-import { spawnVehicle } from "@aifivem/lib/server";
-import { toVehicleSetup } from "@aifivem/lib/shared";
+import {
+  EntityState,
+  fuel,
+  plateOf,
+  spawnVehicle,
+  stateBoolean,
+  stateNumber,
+} from "@aifivem/lib/server";
+import { toVehicleProps, toVehicleSetup } from "@aifivem/lib/shared";
 import type { KeyPurpose } from "@aifivem/shared";
 import { BAGS } from "common/vehicles";
 import { log } from "./log";
@@ -11,6 +18,13 @@ export interface SpawnPoint {
   z: number;
   heading: number;
 }
+
+const ownedBag = new EntityState(BAGS.owned, stateBoolean);
+const idBag = new EntityState(BAGS.id, stateNumber);
+const propsBag = new EntityState(
+  BAGS.props,
+  (v) => toVehicleProps(v) ?? undefined,
+);
 
 /** Owned vehicles in the world: id <-> entity. A vehicle whose entity disappears while out goes to the impound. */
 class World {
@@ -81,6 +95,30 @@ class World {
     this.byEntity.set(entity, id);
     vehicles.update(id, { state: "out", garage: null });
     return NetworkGetNetworkIdFromEntity(entity);
+  }
+
+  /** The entity is an owned vehicle: tracked here, or marked by its bag (spawned before this resource restarted). */
+  isOwned(entity: number): boolean {
+    return this.byEntity.has(entity) || ownedBag.get(entity) === true;
+  }
+
+  /**
+   * Makes an existing entity this vehicle, "out" (`AdoptVehicle`): the plate, orphan mode, fuel and state bags a spawn
+   * gives, so it is tracked like a spawned one (impound when it disappears, garages can store it).
+   */
+  adopt(id: number, entity: number): void {
+    const vehicle = vehicles.get(id);
+    if (!vehicle || !DoesEntityExist(entity)) return;
+    SetEntityOrphanMode(entity, 2);
+    if (plateOf(entity) !== vehicle.plate)
+      SetVehicleNumberPlateText(entity, vehicle.plate);
+    fuel.set(entity, vehicle.fuel);
+    ownedBag.set(entity, true);
+    idBag.set(entity, id);
+    const props = toVehicleProps(vehicle.props);
+    if (props) propsBag.set(entity, { ...props, plate: vehicle.plate });
+    this.entities.set(id, entity);
+    this.byEntity.set(entity, id);
   }
 
   /** Takes the vehicle out of the world (parking); the caller sets the new state. */
