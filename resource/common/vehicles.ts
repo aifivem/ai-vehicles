@@ -1,6 +1,7 @@
 /** ai-vehicles' contracts. No natives. */
 
 export type {
+  DeleteByPlateResult,
   OwnedVehicle,
   VehicleOwner as Owner,
   VehicleOwnerType as OwnerType,
@@ -20,3 +21,6 @@ export const plateFromId = (id: number): string =>
 export { VEHICLES_EVENTS } from "@aifivem/shared";
 
 export type PlateOwner = [plate: string, type: string, id: string];
+
+/** Entity state bag: when an abandoned vehicle is removed (epoch ms); set when its driver leaves, cleared when one sits in. */
+export const ABANDON_BAG = "ai:abandonAt";

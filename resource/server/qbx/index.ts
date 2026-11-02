@@ -1,7 +1,7 @@
 import { provideExport, resourceExport } from "@aifivem/lib/server";
 import { isRecord } from "@aifivem/lib/shared";
 import type { OwnedVehicle } from "common/vehicles";
-import { createVehicle, find, saveVehicle } from "../api";
+import { createVehicle, deleteVehicle, find, saveVehicle } from "../api";
 import { vehicles } from "../store";
 import { world } from "../world";
 import { readQbxProps } from "./props";
@@ -77,8 +77,7 @@ const qbx: Record<string, (...args: unknown[]) => unknown> = {
           ? find(Number(idValue))
           : undefined;
     if (!v) return false;
-    world.despawn(v.id);
-    vehicles.remove(v.id);
+    deleteVehicle(v.id);
     return true;
   },
   GetVehicleIdByPlate: (plate) => find(plate)?.id ?? null,

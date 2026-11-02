@@ -130,3 +130,9 @@ export function storeVehicle(
   world.despawn(id);
   vehicles.update(id, { state, garage });
 }
+
+/** Deletes a vehicle in memory: its entity and its row. */
+export function deleteVehicle(id: number): void {
+  world.despawn(id);
+  vehicles.remove(id);
+}
