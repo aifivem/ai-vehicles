@@ -1,0 +1,266 @@
+{
+  "$schema": "./schemas/settings.schema.json",
+  "cleanup": true,
+  "cleanupScope": "all",
+  "abandonMinutes": 120,
+  "garageMinutes": 20,
+  "scanSeconds": 15,
+  "ownedTo": "impound",
+  "garageSpots": [
+    {
+      "garage": "pillbox",
+      "coords": {
+        "x": 274.29,
+        "y": -334.15,
+        "z": 44.92
+      },
+      "radius": 12
+    },
+    {
+      "garage": "casinogarage",
+      "coords": {
+        "x": 883.96,
+        "y": -4.71,
+        "z": 78.76
+      },
+      "radius": 12
+    },
+    {
+      "garage": "sapcounsel",
+      "coords": {
+        "x": -330.01,
+        "y": -780.33,
+        "z": 33.96
+      },
+      "radius": 12
+    },
+    {
+      "garage": "spanishave",
+      "coords": {
+        "x": -1160.86,
+        "y": -741.41,
+        "z": 19.63
+      },
+      "radius": 12
+    },
+    {
+      "garage": "caears24",
+      "coords": {
+        "x": 69.84,
+        "y": 12.6,
+        "z": 68.96
+      },
+      "radius": 12
+    },
+    {
+      "garage": "caears242",
+      "coords": {
+        "x": -453.7,
+        "y": -786.78,
+        "z": 30.56
+      },
+      "radius": 12
+    },
+    {
+      "garage": "lagunapi",
+      "coords": {
+        "x": 364.37,
+        "y": 297.83,
+        "z": 103.49
+      },
+      "radius": 12
+    },
+    {
+      "garage": "airportp",
+      "coords": {
+        "x": -773.12,
+        "y": -2033.04,
+        "z": 8.88
+      },
+      "radius": 12
+    },
+    {
+      "garage": "beachp",
+      "coords": {
+        "x": -1185.32,
+        "y": -1500.64,
+        "z": 4.38
+      },
+      "radius": 12
+    },
+    {
+      "garage": "themotorhotel",
+      "coords": {
+        "x": 1137.77,
+        "y": 2663.54,
+        "z": 37.9
+      },
+      "radius": 12
+    },
+    {
+      "garage": "liqourparking",
+      "coords": {
+        "x": 883.99,
+        "y": 3649.67,
+        "z": 32.87
+      },
+      "radius": 12
+    },
+    {
+      "garage": "shoreparking",
+      "coords": {
+        "x": 1737.03,
+        "y": 3718.88,
+        "z": 34.05
+      },
+      "radius": 12
+    },
+    {
+      "garage": "haanparking",
+      "coords": {
+        "x": 76.88,
+        "y": 6397.3,
+        "z": 31.23
+      },
+      "radius": 12
+    },
+    {
+      "garage": "dumbogarage",
+      "coords": {
+        "x": 165.75,
+        "y": -3227.2,
+        "z": 5.89
+      },
+      "radius": 12
+    },
+    {
+      "garage": "legion",
+      "coords": {
+        "x": 213.2,
+        "y": -796.05,
+        "z": 30.86
+      },
+      "radius": 12
+    },
+    {
+      "garage": "grapeseedgarage",
+      "coords": {
+        "x": 2552.68,
+        "y": 4671.8,
+        "z": 33.95
+      },
+      "radius": 12
+    },
+    {
+      "garage": "intairport",
+      "coords": {
+        "x": -979.06,
+        "y": -2995.48,
+        "z": 13.95
+      },
+      "radius": 12
+    },
+    {
+      "garage": "higginsheli",
+      "coords": {
+        "x": -722.15,
+        "y": -1472.79,
+        "z": 5
+      },
+      "radius": 12
+    },
+    {
+      "garage": "airsshores",
+      "coords": {
+        "x": 1737.89,
+        "y": 3288.13,
+        "z": 41.14
+      },
+      "radius": 12
+    },
+    {
+      "garage": "airzancudo",
+      "coords": {
+        "x": -1828.25,
+        "y": 2975.44,
+        "z": 32.81
+      },
+      "radius": 12
+    },
+    {
+      "garage": "marina",
+      "coords": {
+        "x": -785.95,
+        "y": -1497.84,
+        "z": -0.09
+      },
+      "radius": 12
+    },
+    {
+      "garage": "paleto",
+      "coords": {
+        "x": -278.21,
+        "y": 6638.13,
+        "z": 7.55
+      },
+      "radius": 12
+    },
+    {
+      "garage": "millars",
+      "coords": {
+        "x": 1298.56,
+        "y": 4212.42,
+        "z": 33.25
+      },
+      "radius": 12
+    },
+    {
+      "garage": "dumborigparking",
+      "coords": {
+        "x": 161.23,
+        "y": -3188.73,
+        "z": 5.97
+      },
+      "radius": 12
+    },
+    {
+      "garage": "popsrigparking",
+      "coords": {
+        "x": 137.67,
+        "y": 6632.99,
+        "z": 31.67
+      },
+      "radius": 12
+    },
+    {
+      "garage": "ronsrigparking",
+      "coords": {
+        "x": -2529.37,
+        "y": 2342.67,
+        "z": 33.06
+      },
+      "radius": 12
+    },
+    {
+      "garage": "ronsrigparking2",
+      "coords": {
+        "x": 2561.67,
+        "y": 476.68,
+        "z": 108.49
+      },
+      "radius": 12
+    },
+    {
+      "garage": "ronsrigparking3",
+      "coords": {
+        "x": -41.24,
+        "y": -2550.63,
+        "z": 6.01
+      },
+      "radius": 12
+    }
+  ],
+  "notifyGarage": true,
+  "blacklist": [],
+  "keepDriven": true
+}

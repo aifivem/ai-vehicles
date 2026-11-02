@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ai-vehicles/data/settings.json",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "This file's JSON Schema (for editors)."
+    },
+    "cleanup": {
+      "description": "Remove left vehicles: Off: vehicles players leave stay until the server restarts.",
+      "type": "boolean"
+    },
+    "cleanupScope": {
+      "description": "Which vehicles: Owned vehicles are the ones players bought or that belong to a job or gang.",
+      "enum": [
+        "unowned",
+        "all"
+      ]
+    },
+    "abandonMinutes": {
+      "description": "Removed after: Minutes after the driver got out, for a vehicle left anywhere but a garage spot.",
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 1440
+    },
+    "garageMinutes": {
+      "description": "Removed after: Minutes after the driver got out, for a vehicle left on a garage spot.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1440
+    },
+    "scanSeconds": {
+      "description": "Check every: How often the server looks at who drives what. Shorter notices quick rides; longer costs less on big servers.",
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 120
+    },
+    "ownedTo": {
+      "description": "Owned vehicles go to: Garage: the garage of the spot the vehicle was left on; a vehicle left elsewhere, or one the garage refuses, goes to the impound.",
+      "enum": [
+        "impound",
+        "garage"
+      ]
+    },
+    "garageSpots": {
+      "description": "Spots",
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "properties": {
+          "garage": {
+            "description": "Garage id: The garage script's id of this garage (ai-garages: the garage's key). Empty: the spot only shortens the time.",
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 32,
+            "pattern": "^[a-z0-9_]*$"
+          },
+          "coords": {
+            "description": "Centre",
+            "type": "object",
+            "required": [
+              "x",
+              "y",
+              "z"
+            ],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "z": {
+                "type": "number"
+              }
+            }
+          },
+          "radius": {
+            "description": "Radius",
+            "type": "number",
+            "minimum": 2,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "garage",
+          "coords",
+          "radius"
+        ]
+      }
+    },
+    "notifyGarage": {
+      "description": "Tell the driver: The driver who leaves a vehicle on a garage spot is told when it will be towed.",
+      "type": "boolean"
+    },
+    "blacklist": {
+      "description": "Never removed: Vehicle models the removal skips.",
+      "type": "array",
+      "maxItems": 200,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 32
+      }
+    },
+    "keepDriven": {
+      "description": "Keep driven vehicles: A street vehicle a player drives stays in the world when no player is near, until it is removed as a left vehicle.",
+      "type": "boolean"
+    }
+  },
+  "required": []
+}
